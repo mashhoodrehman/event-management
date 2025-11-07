@@ -7,6 +7,7 @@ const authRoutes = require("./routes/auth.routes");
 const seedEventTypes = require("./seed/eventTypeSeeder");
 const eventTypeRoutes = require("./routes/eventTypes.routes");
 const eventRoutes = require("./routes/event.routes");
+const path = require("path");
 
 const app = express();
 
@@ -24,12 +25,13 @@ app.use(bodyParser.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/event-types", eventTypeRoutes);
-app.use("/api/events", eventRoutes);
+app.use("/api/event", eventRoutes);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Database Sync
 sequelize
-  .sync()
-  .then(async () => {
+  .sync({ alter: true })
+  .then(async ({}) => {
     console.log("✅ MySQL Database Connected & Synced");
 
     // Run seeder (only if needed)

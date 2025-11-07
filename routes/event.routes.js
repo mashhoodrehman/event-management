@@ -1,12 +1,50 @@
 const express = require("express");
 const router = express.Router();
+// const {
+//   createEvent,
+//   getUserEvents,
+// } = require("../controllers/event.controller");
 const {
-  createEvent,
-  getUserEvents,
+  createOrUpdateEvent,
+  addOrUpdateGuests,
+  updateEventSettings,
+  saveMessageTemplate,
+  saveEventSchedule,
 } = require("../controllers/event.controller");
 const authMiddleware = require("../middleware/authMiddleware");
+const upload = require("../middleware/upload");
+// Step 1: Basic Event Details
+router.post(
+  "/detail",
+  authMiddleware,
+  upload.single("invitationFile"),
+  createOrUpdateEvent
+);
 
-router.post("/create", authMiddleware, createEvent);
-router.get("/user", authMiddleware, getUserEvents);
+// Step 2: Guest List
+router.post(
+  "/guest-list",
+  authMiddleware,
+  upload.fields([{ name: "guestListFile", maxCount: 1 }]),
+  addOrUpdateGuests
+);
+
+// Step 3: Event Settings
+router.post("/automations", authMiddleware, updateEventSettings);
+
+router.post("/message-template", authMiddleware, saveMessageTemplate);
+router.post("/automation-schedule", authMiddleware, saveEventSchedule);
+
+// router.post(
+//   "/create",
+//   // upload.single("invitationFile"),
+//   upload.fields([
+//     { name: "invitationFile", maxCount: 1 },
+//     { name: "guestListFile", maxCount: 1 },
+//   ]),
+//   authMiddleware,
+//   createEvent
+// );
+// router.get("/user", authMiddleware, getUserEvents);
 
 module.exports = router;
