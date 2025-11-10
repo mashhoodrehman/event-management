@@ -14,6 +14,9 @@ const EventSetting = sequelize.define("EventSetting", {
   automaticSending: { type: DataTypes.BOOLEAN, defaultValue: false },
   automaticPause: { type: DataTypes.BOOLEAN, defaultValue: false },
 
+  smsRounds: { type: DataTypes.INTEGER, allowNull: true },
+  smsExecutionDays: { type: DataTypes.INTEGER, allowNull: true },
+
   // Day fields for WhatsApp
   whatsappRounds: { type: DataTypes.INTEGER, allowNull: true },
   whatsappExecutionDays: { type: DataTypes.INTEGER, allowNull: true },

@@ -7,6 +7,7 @@ const authRoutes = require("./routes/auth.routes");
 const seedEventTypes = require("./seed/eventTypeSeeder");
 const eventTypeRoutes = require("./routes/eventTypes.routes");
 const eventRoutes = require("./routes/event.routes");
+const stripeRoutes = require("./routes/stripe.routes");
 const path = require("path");
 
 const app = express();
@@ -18,6 +19,7 @@ app.use(
     credentials: true, // allow cookies/authorization headers if needed
   })
 );
+app.use("/api/stripe", stripeRoutes);
 
 // Middleware
 app.use(bodyParser.json());
