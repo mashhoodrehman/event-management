@@ -143,11 +143,11 @@ const updateEventSettings = async (req, res) => {
       automaticSending,
       automaticPause,
 
-      whatsappStayDays,
+      whatsappRounds,
       whatsappExecutionDays,
-      aiCallStayDays,
+      aiCallRounds,
       aiCallExecutionDays,
-      humanCallStayDays,
+      humanCallRounds,
       humanCallExecutionDays,
     } = req.body;
 
@@ -163,11 +163,11 @@ const updateEventSettings = async (req, res) => {
         humanCallService,
         automaticSending,
         automaticPause,
-        whatsappStayDays,
+        whatsappRounds,
         whatsappExecutionDays,
-        aiCallStayDays,
+        aiCallRounds,
         aiCallExecutionDays,
-        humanCallStayDays,
+        humanCallRounds,
         humanCallExecutionDays,
       },
     });
@@ -180,11 +180,11 @@ const updateEventSettings = async (req, res) => {
         humanCallService,
         automaticSending,
         automaticPause,
-        whatsappStayDays,
+        whatsappRounds,
         whatsappExecutionDays,
-        aiCallStayDays,
+        aiCallRounds,
         aiCallExecutionDays,
-        humanCallStayDays,
+        humanCallRounds,
         humanCallExecutionDays,
       });
     }
@@ -229,25 +229,34 @@ const saveMessageTemplate = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 const saveEventSchedule = async (req, res) => {
   try {
     const { eventId, startDateTime } = req.body;
 
+    // ✅ Validate required fields
     if (!eventId || !startDateTime)
       return res.status(400).json({ error: "Missing required fields" });
 
-    const schedule = await EventAutomationSchedule.upsert(
-      { eventId, startDateTime },
-      { returning: true }
-    );
+    // ✅ Check if schedule already exists for this event
+    const existing = await EventAutomationSchedule.findOne({
+      where: { eventId },
+    });
 
+    if (existing) {
+      // ✅ Update existing schedule
+      await existing.update({ startDateTime });
+    } else {
+      // ✅ Create new schedule
+      await EventAutomationSchedule.create({ eventId, startDateTime });
+    }
+
+    // ✅ Update event progress status
     await Event.update(
       { status: "step5_completed" },
       { where: { id: eventId } }
     );
 
-    res.status(200).json({ message: "Event schedule saved", schedule });
+    res.status(200).json({ message: "Event schedule saved successfully" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal Server Error" });

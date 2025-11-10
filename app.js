@@ -30,7 +30,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Database Sync
 sequelize
-  .sync({ alter: true })
+  .sync()
   .then(async ({}) => {
     console.log("✅ MySQL Database Connected & Synced");
 

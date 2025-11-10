@@ -19,7 +19,7 @@ dist/
 build/
 
 # Sequelize migrations (optional if auto-generated)
-migrations/
+
 
 # Coverage / test output
 coverage/

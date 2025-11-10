@@ -15,15 +15,15 @@ const EventSetting = sequelize.define("EventSetting", {
   automaticPause: { type: DataTypes.BOOLEAN, defaultValue: false },
 
   // Day fields for WhatsApp
-  whatsappStayDays: { type: DataTypes.INTEGER, allowNull: true },
+  whatsappRounds: { type: DataTypes.INTEGER, allowNull: true },
   whatsappExecutionDays: { type: DataTypes.INTEGER, allowNull: true },
 
   // Day fields for AI Call
-  aiCallStayDays: { type: DataTypes.INTEGER, allowNull: true },
+  aiCallRounds: { type: DataTypes.INTEGER, allowNull: true },
   aiCallExecutionDays: { type: DataTypes.INTEGER, allowNull: true },
 
   // Day fields for Human Call
-  humanCallStayDays: { type: DataTypes.INTEGER, allowNull: true },
+  humanCallRounds: { type: DataTypes.INTEGER, allowNull: true },
   humanCallExecutionDays: { type: DataTypes.INTEGER, allowNull: true },
 });
 
