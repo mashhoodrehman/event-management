@@ -12,7 +12,7 @@ const xlsx = require("xlsx");
 // ====================== STEP 1 ======================
 const createOrUpdateEvent = async (req, res) => {
   try {
-    const userId = req.user.id; // assuming JWT middleware sets req.user
+    const userId = req.user.id;
     const {
       eventId,
       name,
@@ -24,30 +24,41 @@ const createOrUpdateEvent = async (req, res) => {
       description,
     } = req.body;
 
-    if (!name || !typeId || !eventDate || !location)
+    if (!name || !typeId || !eventDate || !location) {
       return res.status(400).json({ error: "Required fields missing" });
+    }
 
-    const eventDateObj = new Date(eventDate);
-    const today = new Date();
+    const eventDateObj = new Date(eventDate); // includes time
+    const endDateObj = endDate ? new Date(endDate) : null;
+    const now = new Date();
 
-    // Ensure eventDate is at least 6 days after today
-    const minEventDate = new Date(today);
+    // Event must be at least 6 days after now
+    const minEventDate = new Date(now);
     minEventDate.setDate(minEventDate.getDate() + 6);
 
     if (eventDateObj < minEventDate) {
-      return res.status(400).json({
-        error: "Event date must be at least 6 days after today",
-      });
+      return res
+        .status(400)
+        .json({ error: "Event date must be at least 6 days after today" });
     }
 
+    // End date must be at least 3 days before event date
     const minEndDate = new Date(eventDateObj);
     minEndDate.setDate(minEndDate.getDate() - 3);
-    const finalEndDate = endDate ? new Date(endDate) : minEndDate;
 
-    if (finalEndDate < minEndDate)
+    const finalEndDate = endDateObj || minEndDate;
+
+    if (finalEndDate > eventDateObj) {
+      return res
+        .status(400)
+        .json({ error: "End date cannot be after the event date" });
+    }
+
+    if (finalEndDate < minEndDate) {
       return res
         .status(400)
         .json({ error: "End date must be at least 3 days before event date" });
+    }
 
     const invitationFile = req.file ? req.file.filename : null;
     let event;
@@ -59,7 +70,7 @@ const createOrUpdateEvent = async (req, res) => {
       await event.update({
         name,
         typeId,
-        eventDate,
+        eventDate: eventDateObj,
         endDate: finalEndDate,
         location,
         estimatedGuests,
@@ -72,7 +83,7 @@ const createOrUpdateEvent = async (req, res) => {
         userId,
         name,
         typeId,
-        eventDate,
+        eventDate: eventDateObj,
         endDate: finalEndDate,
         location,
         estimatedGuests,
