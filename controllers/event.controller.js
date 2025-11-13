@@ -109,48 +109,157 @@ const addOrUpdateGuests = async (req, res) => {
     const event = await Event.findByPk(eventId);
     if (!event) return res.status(404).json({ error: "Event not found" });
 
-    let guests = [];
+    let newGuests = [];
     let errors = [];
+    let duplicates = new Set();
+    let duplicateLogs = [];
 
-    // Excel Upload
+    // ======== Normalize Phone Numbers ========
+    const normalizePhone = (phone) => {
+      if (!phone) return null;
+
+      // Remove all non-digit characters
+      phone = phone.replace(/[^\d+]/g, "");
+
+      // Pakistan: 0333..., 333..., +92333...
+      if (/^0?3\d{9}$/.test(phone)) {
+        if (phone.startsWith("0")) phone = phone.slice(1);
+        return "+92" + phone;
+      }
+      if (/^\+923\d{9}$/.test(phone)) return phone;
+
+      // Israel: 05..., 5..., +9725...
+      if (/^0?5\d{8}$/.test(phone)) {
+        if (phone.startsWith("0")) phone = phone.slice(1);
+        return "+972" + phone;
+      }
+      if (/^\+9725\d{8}$/.test(phone)) return phone;
+
+      return null; // invalid
+    };
+
+    // ======== Process Excel Upload ========
     if (guestListFile) {
       const workbook = xlsx.readFile(guestListFile);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
+
       rows.forEach((row, index) => {
         const name = row[0] ? String(row[0]).trim() : null;
-        const phone = row[1] ? String(row[1]).trim() : null;
-        if (!name || !phone)
+        const phoneRaw = row[1] ? String(row[1]).trim() : null;
+
+        if (!name || !phoneRaw) {
           errors.push(`Row ${index + 1}: Missing ${!name ? "name" : "phone"}`);
-        else guests.push({ name, phone, eventId });
+          return;
+        }
+
+        const normalized = normalizePhone(phoneRaw);
+        if (!normalized) {
+          errors.push(`Row ${index + 1}: Invalid phone → ${phoneRaw}`);
+          return;
+        }
+
+        if (duplicates.has(normalized)) {
+          duplicateLogs.push(`Row ${index + 1}: Duplicate phone → ${phoneRaw}`);
+          return;
+        }
+
+        duplicates.add(normalized);
+        newGuests.push({ name, phone: normalized, eventId });
       });
     }
 
-    // Manual Entry
+    // ======== Process Manual Entry ========
     if (guestList) {
       const lines = guestList.split(/\n+/).filter((l) => l.trim());
+
       lines.forEach((line, index) => {
-        const match = line.match(/^(.+?)\s*[-–—]\s*(\+?\d{6,})$/);
-        if (!match)
+        // Remove invisible characters
+        const cleanLine = line.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+
+        // Split by dash (-, –, —) with spaces
+        const parts = cleanLine.split(/\s*[-–—]\s*/);
+        if (parts.length !== 2) {
           errors.push(`Line ${index + 1}: Invalid format → "${line}"`);
-        else {
-          const [, name, phone] = match;
-          guests.push({ name: name.trim(), phone: phone.trim(), eventId });
+          return;
         }
+
+        const nameTrimmed = parts[0].trim();
+        const phoneTrimmed = parts[1].trim().replace(/[^\d+]/g, "");
+
+        if (!nameTrimmed || !phoneTrimmed) {
+          errors.push(`Line ${index + 1}: Missing name or phone → "${line}"`);
+          return;
+        }
+
+        const normalized = normalizePhone(phoneTrimmed);
+        if (!normalized) {
+          errors.push(`Line ${index + 1}: Invalid phone → ${phoneTrimmed}`);
+          return;
+        }
+
+        if (duplicates.has(normalized)) {
+          duplicateLogs.push(
+            `Line ${index + 1}: Duplicate phone → ${phoneTrimmed}`
+          );
+          return;
+        }
+
+        duplicates.add(normalized);
+        newGuests.push({ name: nameTrimmed, phone: normalized, eventId });
       });
     }
 
-    if (errors.length > 0)
-      return res
-        .status(400)
-        .json({ error: "Invalid guest data", details: errors });
+    // ======== Validation ========
+    if (errors.length > 0) {
+      return res.status(400).json({
+        error: "Invalid guest data",
+        details: errors,
+      });
+    }
 
-    await Guest.destroy({ where: { eventId } });
-    if (guests.length > 0) await Guest.bulkCreate(guests);
+    // ======== Merge with Existing Guests ========
+    const existingGuests = await Guest.findAll({
+      where: { eventId },
+      attributes: ["id", "name", "phone"],
+    });
+
+    const existingMap = new Map(existingGuests.map((g) => [g.phone, g]));
+
+    const toUpdate = [];
+    const toInsert = [];
+
+    for (const g of newGuests) {
+      const existing = existingMap.get(g.phone);
+      if (existing) {
+        if (existing.name !== g.name) {
+          toUpdate.push({ id: existing.id, name: g.name });
+        }
+      } else {
+        toInsert.push(g);
+      }
+    }
+
+    // Update names
+    for (const u of toUpdate) {
+      await Guest.update({ name: u.name }, { where: { id: u.id } });
+    }
+
+    // Insert new guests
+    if (toInsert.length > 0) {
+      await Guest.bulkCreate(toInsert);
+    }
 
     await event.update({ status: "step2_completed" });
 
-    res.status(200).json({ message: "Guests saved successfully", guests });
+    res.status(200).json({
+      message: "Guests merged successfully",
+      added: toInsert.length,
+      updated: toUpdate.length,
+      duplicateCount: duplicateLogs.length,
+      duplicates: duplicateLogs,
+      totalGuests: existingGuests.length + toInsert.length,
+    });
   } catch (err) {
     console.error("Step 2 Error:", err);
     res.status(500).json({ error: "Server error" });
