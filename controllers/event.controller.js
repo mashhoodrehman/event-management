@@ -522,6 +522,53 @@ const saveEventSchedule = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+const getEventDetails = async (req, res) => {
+  try {
+    const userId = req.user.id; // from middleware
+    const { eventId } = req.params; // or req.query if you prefer
+
+    if (!eventId) {
+      return res.status(400).json({ error: "Event ID is required" });
+    }
+
+    // 🔍 Fetch main event (and verify it belongs to the user)
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    // 🔹 Fetch related data
+    const [guests, settings, messageTemplate, schedule, payment] =
+      await Promise.all([
+        Guest.findAll({ where: { eventId } }),
+        EventSetting.findOne({ where: { eventId } }),
+        MessageTemplate.findOne({ where: { eventId } }),
+        EventAutomationSchedule.findOne({ where: { eventId } }),
+        Payment.findOne({ where: { eventId } }),
+      ]);
+
+    // ✅ Combine all data
+    const response = {
+      event,
+      guests,
+      settings,
+      messageTemplate,
+      schedule,
+      payment,
+    };
+
+    res.status(200).json({
+      message: "Event details fetched successfully",
+      data: response,
+    });
+  } catch (err) {
+    console.error("Get Event Error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
 
 module.exports = {
   createOrUpdateEvent,
@@ -529,6 +576,7 @@ module.exports = {
   updateEventSettings,
   saveMessageTemplate,
   saveEventSchedule,
+  getEventDetails,
 };
 
 // const Event = require("../models/event.model");
