@@ -30,6 +30,8 @@ app.use("/api/event-types", eventTypeRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+require("./cron/automationRunner");
+
 // Database Sync
 sequelize
   .sync()

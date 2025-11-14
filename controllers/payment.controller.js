@@ -5,7 +5,11 @@ const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/payment.model");
 const Event = require("../models/event.model");
 const Guest = require("../models/guest.model");
+const EventSetting = require("../models/eventSetting.model");
+const MessageTemplate = require("../models/messageTemplate.model");
+const EventAutomationSchedule = require("../models/eventAutomationSchedule.model");
 const sendSMS = require("../helper/sendSms");
+const { createAutomations } = require("../services/automationScheduler");
 
 const processSetupFee = async (req, res) => {
   try {
@@ -67,24 +71,62 @@ const processSetupFee = async (req, res) => {
       status: "initiated",
       clientSecret: paymentIntent.client_secret, // save if needed
     });
+    // // ================= SEND SMS TO GUESTS =================
+    // const guests = await Guest.findAll({ where: { eventId } });
+
+    // // const smsUrl = process.env.SMS_API_URL;
+    // // const apiHeaders = { Authorization: `Bearer ${process.env.SMS_API_KEY}` };
+
+    // const message = `Hi! You are invited to the event "${event.name}". Please check details.`;
+
+    // // Send SMS to each guest sequentially
+    // for (const guest of guests) {
+    //   if (guest.phone) {
+    //     try {
+    //       // await sendSMS(smsUrl, guest.phone, message, apiHeaders);
+    //       console.log(`SMS sent to ${guest.phone}`);
+    //     } catch (err) {
+    //       console.error(`Failed to send SMS to ${guest.phone}:`, err.message);
+    //     }
+    //   }
+    // }
+
     // ================= SEND SMS TO GUESTS =================
     const guests = await Guest.findAll({ where: { eventId } });
-
-    // const smsUrl = process.env.SMS_API_URL;
-    // const apiHeaders = { Authorization: `Bearer ${process.env.SMS_API_KEY}` };
-
     const message = `Hi! You are invited to the event "${event.name}". Please check details.`;
-
-    // Send SMS to each guest sequentially
     for (const guest of guests) {
-      if (guest.phone) {
-        try {
-          // await sendSMS(smsUrl, guest.phone, message, apiHeaders);
-          console.log(`SMS sent to ${guest.phone}`);
-        } catch (err) {
-          console.error(`Failed to send SMS to ${guest.phone}:`, err.message);
-        }
-      }
+      if (guest.phone) console.log(`SMS sent to ${guest.phone}`); // replace with sendSMS when live
+    }
+
+    // ================= CREATE AUTOMATION SCHEDULE =================
+    // Fetch event settings
+    const settings = await EventSetting.findOne({ where: { eventId } });
+    console.log(settings, "settings ssssssssss");
+    if (!settings) {
+      console.warn("Event settings not found. Automations not scheduled.");
+    } else {
+      // Fetch templates
+      const template = await MessageTemplate.findOne({ where: { eventId } });
+      console.log(template, "template tttttttttt");
+
+      const templates = {
+        smsTemplateId: template?.id || null,
+        whatsappTemplateId: template?.id || null,
+        aiCallTemplateId: template?.id || null,
+        humanCallTemplateId: template?.id || null,
+      };
+
+      const automation = await EventAutomationSchedule.findOne({
+        where: { eventId },
+      });
+      // // Set event.automationStartDate if not set
+      // if (!event.automationStartDate) {
+      //   event.automationStartDate = new Date(); // or any logic to pick start date
+      //   await event.save();
+      // }
+
+      // // Create automation schedules
+      await createAutomations(event, settings, guests, templates);
     }
 
     // Do NOT mark event as completed here — only after success webhook
