@@ -6,6 +6,10 @@ const HumanCallAutomation = sequelize.define("HumanCallAutomation", {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  rsvpToken: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   templateId: {
     type: DataTypes.INTEGER,
     allowNull: false,

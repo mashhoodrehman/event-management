@@ -6,6 +6,10 @@ const AICallAutomation = sequelize.define("AICallAutomation", {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  rsvpToken: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   templateId: {
     type: DataTypes.INTEGER,
     allowNull: false,

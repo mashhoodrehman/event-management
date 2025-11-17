@@ -4,7 +4,7 @@ const SMSAutomation = require("../models/smsAutomation.model");
 const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
-const sendSMS = require("../helper/sendSms");
+const smsService = require("../services/sms.service");
 // You can add WhatsApp, AI, Human Call helpers similarly
 
 /**
@@ -24,7 +24,23 @@ async function processAutomation(model, type) {
       switch (type) {
         case "SMS":
           if (task.guestNumber) {
-            // await sendSMS(task.guestNumber, yourTemplateLogic(task.templateId));
+            // 1. get message using template ID
+            const message = await smsService.getMessageByTemplate(
+              task.templateId,
+              {
+                name: task.guestName, // if needed
+                eventDate: task.eventDate,
+              }
+            );
+
+            // 2. send the SMS
+            await smsService.sendSMS(
+              task.guestNumber,
+              message,
+              task.rsvpToken,
+              task.senderName
+            );
+
             console.log(`SMS sent to ${task.guestNumber}`);
           }
           break;
@@ -39,7 +55,7 @@ async function processAutomation(model, type) {
           break;
       }
 
-      task.status = "completed";
+      task.status = "success";
       await task.save();
     } catch (err) {
       console.error(`Failed to execute ${type} for ${task.guestNumber}:`, err);

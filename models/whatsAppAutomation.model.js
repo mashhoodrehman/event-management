@@ -6,6 +6,10 @@ const WhatsAppAutomation = sequelize.define("WhatsAppAutomation", {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  rsvpToken: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   templateId: {
     type: DataTypes.INTEGER,
     allowNull: false,

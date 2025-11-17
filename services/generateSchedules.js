@@ -95,6 +95,7 @@ function generateSchedules({
         tasks.push({
           type: auto.key, // e.g. 'SMS', 'WhatsApp', 'AI_CALL', 'HUMAN_CALL'
           guestNumber: guests[i].phone,
+          rsvpToken: guests[i].rsvpToken,
           templateId: auto.templateId || null,
           round: r + 1,
           scheduledAt,

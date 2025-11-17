@@ -66,6 +66,7 @@ async function createAutomations(event, settings, guests, templates) {
     .filter((t) => t.type === "SMS")
     .map((t) => ({
       guestNumber: t.guestNumber,
+      rsvpToken: t.rsvpToken,
       templateId: t.templateId,
       status: "pending",
       scheduledAt: t.scheduledAt,
@@ -77,6 +78,7 @@ async function createAutomations(event, settings, guests, templates) {
     .filter((t) => t.type === "WhatsApp")
     .map((t) => ({
       guestNumber: t.guestNumber,
+      rsvpToken: t.rsvpToken,
       templateId: t.templateId,
       status: "pending",
       scheduledAt: t.scheduledAt,
@@ -87,6 +89,7 @@ async function createAutomations(event, settings, guests, templates) {
     .filter((t) => t.type === "AI_CALL")
     .map((t) => ({
       guestNumber: t.guestNumber,
+      rsvpToken: t.rsvpToken,
       templateId: t.templateId,
       status: "pending",
       scheduledAt: t.scheduledAt,
@@ -97,6 +100,7 @@ async function createAutomations(event, settings, guests, templates) {
     .filter((t) => t.type === "HUMAN_CALL")
     .map((t) => ({
       guestNumber: t.guestNumber,
+      rsvpToken: t.rsvpToken,
       templateId: t.templateId,
       status: "pending",
       scheduledAt: t.scheduledAt,

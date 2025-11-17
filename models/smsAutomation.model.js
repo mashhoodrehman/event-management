@@ -6,6 +6,10 @@ const SMSAutomation = sequelize.define("SMSAutomation", {
     type: DataTypes.STRING,
     allowNull: false,
   },
+  rsvpToken: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
   templateId: {
     type: DataTypes.INTEGER,
     allowNull: false,

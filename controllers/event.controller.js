@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const Event = require("../models/event.model");
 const Guest = require("../models/guest.model");
 const EventSetting = require("../models/eventSetting.model");
@@ -149,23 +150,32 @@ const addOrUpdateGuests = async (req, res) => {
         const phoneRaw = row[1] ? String(row[1]).trim() : null;
 
         if (!name || !phoneRaw) {
+          console.log(111111111);
           errors.push(`Row ${index + 1}: Missing ${!name ? "name" : "phone"}`);
           return;
         }
 
         const normalized = normalizePhone(phoneRaw);
         if (!normalized) {
+          console.log(22222222);
           errors.push(`Row ${index + 1}: Invalid phone → ${phoneRaw}`);
           return;
         }
 
         if (duplicates.has(normalized)) {
+          console.log(3333333333);
           duplicateLogs.push(`Row ${index + 1}: Duplicate phone → ${phoneRaw}`);
           return;
         }
 
         duplicates.add(normalized);
-        newGuests.push({ name, phone: normalized, eventId });
+        newGuests.push({
+          name,
+          phone: normalized,
+          eventId,
+          status: "pending",
+          rsvpToken: crypto.randomBytes(16).toString("hex"),
+        });
       });
     }
 
@@ -206,14 +216,20 @@ const addOrUpdateGuests = async (req, res) => {
         }
 
         duplicates.add(normalized);
-        newGuests.push({ name: nameTrimmed, phone: normalized, eventId });
+        newGuests.push({
+          name: nameTrimmed,
+          phone: normalized,
+          eventId,
+          status: "pending",
+          rsvpToken: crypto.randomBytes(16).toString("hex"),
+        });
       });
     }
 
     // ======== Validation ========
     if (errors.length > 0) {
       return res.status(400).json({
-        error: "Invalid guest data",
+        error: errors || "Invalid guest data",
         details: errors,
       });
     }
@@ -221,7 +237,7 @@ const addOrUpdateGuests = async (req, res) => {
     // ======== Merge with Existing Guests ========
     const existingGuests = await Guest.findAll({
       where: { eventId },
-      attributes: ["id", "name", "phone"],
+      attributes: ["id", "name", "phone", "rsvpToken", "status"],
     });
 
     const existingMap = new Map(existingGuests.map((g) => [g.phone, g]));
