@@ -11,6 +11,7 @@ const {
   saveMessageTemplate,
   saveEventSchedule,
   getEventDetails,
+  getUserEvents,
 } = require("../controllers/event.controller");
 const { processSetupFee } = require("../controllers/payment.controller");
 const authMiddleware = require("../middleware/authMiddleware");
@@ -37,6 +38,7 @@ router.post("/automations", authMiddleware, updateEventSettings);
 router.post("/message-template", authMiddleware, saveMessageTemplate);
 router.post("/automation-schedule", authMiddleware, saveEventSchedule);
 router.post("/setup-fee", authMiddleware, processSetupFee);
+router.get("/list", authMiddleware, getUserEvents);
 router.get("/details/:eventId", authMiddleware, getEventDetails);
 
 // router.post(

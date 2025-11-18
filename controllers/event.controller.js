@@ -585,6 +585,25 @@ const getEventDetails = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+const getUserEvents = async (req, res) => {
+  try {
+    const userId = req.user.id; // Logged-in user
+
+    const events = await Event.findAll({
+      where: { userId },
+      attributes: ["id", "name"], // Return only eventId & eventName
+      order: [["createdAt", "DESC"]], // latest first (optional)
+    });
+
+    return res.status(200).json({
+      message: "Event list fetched successfully",
+      events,
+    });
+  } catch (error) {
+    console.error("Get Events Error:", error);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
 
 module.exports = {
   createOrUpdateEvent,
@@ -593,6 +612,7 @@ module.exports = {
   saveMessageTemplate,
   saveEventSchedule,
   getEventDetails,
+  getUserEvents,
 };
 
 // const Event = require("../models/event.model");
