@@ -2,61 +2,55 @@
 
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("Guests", {
+    await queryInterface.createTable("SMSAutomations", {
       id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         allowNull: false,
       },
-
-      name: {
+      guestNumber: {
         type: Sequelize.STRING,
         allowNull: false,
       },
-
-      phone: {
-        type: Sequelize.STRING,
-        allowNull: false,
-      },
-
-      status: {
-        type: Sequelize.ENUM("pending", "confirmed", "hesitate", "cancel"),
-        allowNull: false,
-        defaultValue: "pending",
-      },
-
       rsvpToken: {
         type: Sequelize.STRING,
-        unique: true,
+        allowNull: false,
       },
-
+      templateId: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
+      status: {
+        type: Sequelize.ENUM("pending", "failed", "success"),
+        defaultValue: "pending",
+      },
+      scheduledAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+      },
       eventId: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        references: {
-          model: "Events", // your events table
-          key: "id",
-        },
-        onUpdate: "CASCADE",
-        onDelete: "CASCADE",
+      },
+      round: {
+        type: Sequelize.INTEGER,
+        defaultValue: 1,
       },
 
+      // timestamps
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.fn("NOW"),
       },
-
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.fn("NOW"),
       },
     });
   },
 
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("Guests");
+    await queryInterface.dropTable("SMSAutomations");
   },
 };
