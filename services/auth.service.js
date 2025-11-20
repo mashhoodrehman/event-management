@@ -25,19 +25,19 @@ const signup = async ({ name, email, password, type }) => {
     verificationToken,
   });
 
-  // const verificationLink = `http://localhost:5000/api/auth/verify?token=${verificationToken}`;
+  const verificationLink = `http://localhost:5000/api/auth/verify?token=${verificationToken}`;
 
-  // await transporter.sendMail({
-  //   from: process.env.EMAIL_USER,
-  //   to: email,
-  //   subject: "Verify your account",
-  //   html: `
-  //     <h2>Welcome, ${name}!</h2>
-  //     <p>Your account type: <b>${type}</b></p>
-  //     <p>Click the link below to verify your account:</p>
-  //     <a href="${verificationLink}" target="_blank">${verificationLink}</a>
-  //   `,
-  // });
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Verify your account",
+    html: `
+      <h2>Welcome, ${name}!</h2>
+      <p>Your account type: <b>${type}</b></p>
+      <p>Click the link below to verify your account:</p>
+      <a href="${verificationLink}" target="_blank">${verificationLink}</a>
+    `,
+  });
 
   return {
     message: "User registered. Please check your email for verification link.",
@@ -49,8 +49,8 @@ const login = async ({ email, password }) => {
   const user = await User.findOne({ where: { email } });
   if (!user) throw new Error("User not found");
 
-  // if (!user.isVerified)
-  //   throw new Error("Account not verified. Please check your email.");
+  if (!user.isVerified)
+    throw new Error("Account not verified. Please check your email.");
 
   const validPassword = await bcrypt.compare(password, user.password);
   if (!validPassword) throw new Error("Invalid password");
