@@ -29,36 +29,64 @@ const createOrUpdateEvent = async (req, res) => {
       return res.status(400).json({ error: "Required fields missing" });
     }
 
-    const eventDateObj = new Date(eventDate); // includes time
-    const endDateObj = endDate ? new Date(endDate) : null;
-    const now = new Date();
+    // Helpers to work with *dates only* (no time)
+    const toStartOfDay = (date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
 
-    // Event must be at least 6 days after now
-    const minEventDate = new Date(now);
-    minEventDate.setDate(minEventDate.getDate() + 6);
+    const diffInDays = (from, to) => {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      return Math.floor((toStartOfDay(to) - toStartOfDay(from)) / msPerDay);
+    };
 
-    if (eventDateObj < minEventDate) {
+    const today = toStartOfDay(new Date());
+    const eventDateObj = toStartOfDay(eventDate);
+    let endDateObj = endDate ? toStartOfDay(endDate) : null;
+
+    // Event must be at least 6 days after today (calendar days)
+    const daysFromTodayToEvent = diffInDays(today, eventDateObj);
+
+    if (daysFromTodayToEvent < 6) {
       return res
         .status(400)
         .json({ error: "Event date must be at least 6 days after today" });
     }
 
-    // End date must be at least 3 days before event date
-    const minEndDate = new Date(eventDateObj);
-    minEndDate.setDate(minEndDate.getDate() - 3);
-
-    const finalEndDate = endDateObj || minEndDate;
-
-    if (finalEndDate > eventDateObj) {
-      return res
-        .status(400)
-        .json({ error: "End date cannot be after the event date" });
+    // Default end date = exactly 3 days before event date if not provided
+    if (!endDateObj) {
+      endDateObj = new Date(eventDateObj);
+      endDateObj.setDate(endDateObj.getDate() - 3);
     }
 
-    if (finalEndDate < minEndDate) {
+    const daysFromTodayToEnd = diffInDays(today, endDateObj);
+
+    if (daysFromTodayToEnd < 3) {
+      return res.status(400).json({
+        error: "End date must be at least 3 days after today",
+      });
+    }
+
+    // End date must be before event date
+    // if (endDateObj >= eventDateObj) {
+    //   return res
+    //     .status(400)
+    //     .json({ error: "End date cannot be on or after the event date" });
+    // }
+
+    // End date must be at least 3 full days before event date
+    const daysFromEndToEvent = diffInDays(endDateObj, eventDateObj);
+
+    if (daysFromEndToEvent < 3) {
+      return res.status(400).json({
+        error: "End date must be at least 3 days before event date",
+      });
+    }
+    if (endDateObj >= eventDateObj) {
       return res
         .status(400)
-        .json({ error: "End date must be at least 3 days before event date" });
+        .json({ error: "End date cannot be on or after the event date" });
     }
 
     const invitationFile = req.file ? req.file.filename : null;
@@ -72,7 +100,7 @@ const createOrUpdateEvent = async (req, res) => {
         name,
         typeId,
         eventDate: eventDateObj,
-        endDate: finalEndDate,
+        endDate: endDateObj,
         location,
         estimatedGuests,
         description,
@@ -85,7 +113,7 @@ const createOrUpdateEvent = async (req, res) => {
         name,
         typeId,
         eventDate: eventDateObj,
-        endDate: finalEndDate,
+        endDate: endDateObj,
         location,
         estimatedGuests,
         description,
@@ -307,12 +335,29 @@ const updateEventSettings = async (req, res) => {
     const event = await Event.findByPk(eventId);
     if (!event) return res.status(404).json({ error: "Event not found" });
 
-    const eventDate = new Date(event.eventDate);
-    const today = new Date();
+    const toStartOfDay = (date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
 
-    const totalDaysAvailable = Math.floor(
-      (eventDate - today) / (1000 * 60 * 60 * 24)
-    );
+    const diffInDays = (from, to) => {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      return Math.floor((toStartOfDay(to) - toStartOfDay(from)) / msPerDay);
+    };
+
+    const today = toStartOfDay(new Date());
+    const eventDateObj = toStartOfDay(event.eventDate);
+
+    // const eventDate = new Date(event.eventDate);
+    // const today = new Date();
+
+    // const totalDaysAvailable = Math.floor(
+    //   (eventDate - today) / (1000 * 60 * 60 * 24)
+    // );
+    // console.log(totalDaysAvailable, "mmmmmmmr");
+
+    const totalDaysAvailable = diffInDays(today, eventDateObj);
 
     if (totalDaysAvailable < 6) {
       return res.status(400).json({
