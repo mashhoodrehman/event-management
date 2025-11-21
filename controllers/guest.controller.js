@@ -1,3 +1,5 @@
+const { Op } = require("sequelize");
+
 const Guest = require("../models/guest.model");
 const Event = require("../models/event.model");
 
@@ -85,7 +87,49 @@ const getGuestDetails = async (req, res) => {
   }
 };
 
+const getGuestsByFilters = async (req, res) => {
+  try {
+    const { eventId, status } = req.query;
+    const userId = req.user.id; // From auth middleware
+
+    if (!eventId) return res.status(400).json({ error: "eventId is required" });
+
+    // Verify event belongs to user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event)
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+
+    // Build filter
+    const whereCondition = { eventId };
+
+    if (status) {
+      // status can be single or comma separated, e.g., "confirmed,hesitate"
+      const statusArray = status.split(","); // ["confirmed", "hesitate"]
+      whereCondition.status = { [Op.in]: statusArray };
+    }
+
+    // Fetch guests
+    const guests = await Guest.findAll({
+      where: whereCondition,
+      order: [["id", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      total: guests.length,
+      data: guests,
+    });
+  } catch (error) {
+    console.error("Error fetching guests:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   updateRSVPStatus,
   getGuestDetails,
+  getGuestsByFilters,
 };
