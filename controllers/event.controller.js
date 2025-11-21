@@ -42,7 +42,8 @@ const createOrUpdateEvent = async (req, res) => {
     };
 
     const today = toStartOfDay(new Date());
-    const eventDateObj = toStartOfDay(eventDate);
+    const eventDateTime = new Date(eventDate);
+    const eventDateObj = toStartOfDay(eventDateTime);
     let endDateObj = endDate ? toStartOfDay(endDate) : null;
 
     // Event must be at least 6 days after today (calendar days)
@@ -99,7 +100,7 @@ const createOrUpdateEvent = async (req, res) => {
       await event.update({
         name,
         typeId,
-        eventDate: eventDateObj,
+        eventDate: eventDateTime,
         endDate: endDateObj,
         location,
         estimatedGuests,
@@ -112,7 +113,7 @@ const createOrUpdateEvent = async (req, res) => {
         userId,
         name,
         typeId,
-        eventDate: eventDateObj,
+        eventDate: eventDateTime,
         endDate: endDateObj,
         location,
         estimatedGuests,
@@ -348,6 +349,12 @@ const updateEventSettings = async (req, res) => {
 
     const today = toStartOfDay(new Date());
     const eventDateObj = toStartOfDay(event.eventDate);
+    const endDateObj = event.endDate
+      ? toStartOfDay(event.endDate)
+      : eventDateObj;
+
+    // Use the automation end date if it exists
+    const lastAutomationDay = endDateObj;
 
     // const eventDate = new Date(event.eventDate);
     // const today = new Date();
@@ -357,14 +364,14 @@ const updateEventSettings = async (req, res) => {
     // );
     // console.log(totalDaysAvailable, "mmmmmmmr");
 
-    const totalDaysAvailable = diffInDays(today, eventDateObj);
+    const totalDaysAvailable = diffInDays(today, lastAutomationDay);
 
-    if (totalDaysAvailable < 6) {
-      return res.status(400).json({
-        error:
-          "Event date must be at least 6 days after today to schedule automations.",
-      });
-    }
+    // if (totalDaysAvailable < 6) {
+    //   return res.status(400).json({
+    //     error:
+    //       "Event date must be at least 6 days after today to schedule automations.",
+    //   });
+    // }
 
     // ✅ Define automation priorities
     const automations = [
@@ -508,25 +515,62 @@ const saveEventSchedule = async (req, res) => {
     const { eventId, startDateTime } = req.body;
 
     // ✅ Validate required fields
-    if (!eventId || !startDateTime)
+    if (!eventId || !startDateTime) {
       return res.status(400).json({ error: "Missing required fields" });
+    }
+
     const event = await Event.findByPk(eventId);
     if (!event) return res.status(404).json({ error: "Event not found" });
+
     const settings = await EventSetting.findOne({ where: { eventId } });
-    if (!settings)
+    if (!settings) {
       return res.status(400).json({
         error: "Please complete automation settings before scheduling.",
       });
+    }
 
-    const eventDate = new Date(event.eventDate);
-    const startDate = new Date(startDateTime);
+    // 🔹 Helpers: work in calendar days (ignore time) for all rules
+    const toStartOfDay = (date) => {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    };
 
-    if (startDate >= eventDate)
+    const diffInDays = (from, to) => {
+      const msPerDay = 1000 * 60 * 60 * 24;
+      return Math.floor((toStartOfDay(to) - toStartOfDay(from)) / msPerDay);
+    };
+
+    // 🔹 Full objects (with time)
+    const eventDateTime = new Date(event.eventDate);
+    const startDateTimeObj = new Date(startDateTime);
+
+    // 🔹 Date-only versions for validation
+    const eventDateDay = toStartOfDay(eventDateTime);
+    const startDateDay = toStartOfDay(startDateTimeObj);
+
+    // 🔹 Decide what is the "last automation day":
+    //     prefer endDate (automation end), fall back to eventDate
+    const endDateDay = event.endDate
+      ? toStartOfDay(event.endDate)
+      : eventDateDay;
+
+    // start must be strictly before the event date (business rule)
+    if (startDateDay >= eventDateDay) {
       return res.status(400).json({
         error: "Automation start date must be before the event date.",
       });
+    }
 
-    // Calculate total required days based on all automations
+    // Also make sure start is not after the automation end date
+    if (startDateDay > endDateDay) {
+      return res.status(400).json({
+        error:
+          "Automation start date must be on or before the automation end date.",
+      });
+    }
+
+    // ✅ Calculate total required days based on all automations
     const automations = [
       settings.smsService && {
         type: "SMS",
@@ -548,9 +592,9 @@ const saveEventSchedule = async (req, res) => {
 
     const maxRequiredDays = Math.max(...automations.map((a) => a.days), 0);
 
-    const diffDays = Math.floor(
-      (eventDate - startDate) / (1000 * 60 * 60 * 24)
-    );
+    // 🔹 Days available for automations:
+    // from startDateDay (inclusive) until endDateDay (exclusive of event day)
+    const diffDays = diffInDays(startDateDay, endDateDay);
 
     if (diffDays < maxRequiredDays) {
       return res.status(400).json({
@@ -565,10 +609,13 @@ const saveEventSchedule = async (req, res) => {
 
     if (existing) {
       // ✅ Update existing schedule
-      await existing.update({ startDateTime });
+      await existing.update({ startDateTime: startDateTimeObj });
     } else {
       // ✅ Create new schedule
-      await EventAutomationSchedule.create({ eventId, startDateTime });
+      await EventAutomationSchedule.create({
+        eventId,
+        startDateTime: startDateTimeObj,
+      });
     }
 
     // ✅ Update event progress status
@@ -583,6 +630,7 @@ const saveEventSchedule = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
 const getEventDetails = async (req, res) => {
   try {
     const userId = req.user.id; // from middleware
