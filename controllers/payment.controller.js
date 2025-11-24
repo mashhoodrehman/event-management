@@ -93,21 +93,16 @@ const processSetupFee = async (req, res) => {
 
     // ================= SEND SMS TO GUESTS =================
     const guests = await Guest.findAll({ where: { eventId } });
-    const message = `Hi! You are invited to the event "${event.name}". Please check details.`;
-    for (const guest of guests) {
-      if (guest.phone) console.log(`SMS sent to ${guest.phone}`); // replace with sendSMS when live
-    }
 
     // ================= CREATE AUTOMATION SCHEDULE =================
     // Fetch event settings
     const settings = await EventSetting.findOne({ where: { eventId } });
-    console.log(settings, "settings ssssssssss");
+
     if (!settings) {
       console.warn("Event settings not found. Automations not scheduled.");
     } else {
       // Fetch templates
       const template = await MessageTemplate.findOne({ where: { eventId } });
-      console.log(template, "template tttttttttt");
 
       const templates = {
         smsTemplateId: template?.id || null,
@@ -141,4 +136,31 @@ const processSetupFee = async (req, res) => {
   }
 };
 
-module.exports = { processSetupFee };
+const getPaymentsByEvent = async (req, res) => {
+  const { eventId } = req.query;
+  const userId = req.user.id;
+
+  if (!eventId) return res.status(400).json({ error: "eventId is required" });
+
+  try {
+    // Verify the event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) return res.status(404).json({ error: "Event not found" });
+
+    // Fetch all payments for this event
+    const payments = await Payment.findAll({
+      where: { eventId },
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.json({ payments });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
+
+module.exports = { processSetupFee, getPaymentsByEvent };
