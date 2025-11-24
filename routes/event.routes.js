@@ -13,7 +13,10 @@ const {
   getEventDetails,
   getUserEvents,
 } = require("../controllers/event.controller");
-const { processSetupFee } = require("../controllers/payment.controller");
+const {
+  processSetupFee,
+  getPaymentsByEvent,
+} = require("../controllers/payment.controller");
 const authMiddleware = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
 // Step 1: Basic Event Details
@@ -38,6 +41,7 @@ router.post("/automations", authMiddleware, updateEventSettings);
 router.post("/message-template", authMiddleware, saveMessageTemplate);
 router.post("/automation-schedule", authMiddleware, saveEventSchedule);
 router.post("/setup-fee", authMiddleware, processSetupFee);
+router.get("/payments", authMiddleware, getPaymentsByEvent);
 router.get("/list", authMiddleware, getUserEvents);
 router.get("/details/:eventId", authMiddleware, getEventDetails);
 
