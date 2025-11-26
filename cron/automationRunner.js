@@ -5,6 +5,9 @@ const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const smsService = require("../services/sms.service");
+const whatsappService = require("../services/whatsapp.service");
+const Event = require("../models/event.model"); // 👈 add this
+
 // You can add WhatsApp, AI, Human Call helpers similarly
 
 /**
@@ -24,12 +27,37 @@ async function processAutomation(model, type) {
       switch (type) {
         case "SMS":
           if (task.guestNumber) {
-            // 1. get message using template ID
+            const event = task.eventId
+              ? await Event.findByPk(task.eventId)
+              : null;
+
+            // 🔹 Build RSVP link
+            const baseUrl =
+              process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
+            const rsvpLink = `${baseUrl}?token=${task.rsvpToken}`;
+
+            // 🔹 Choose values (from Event first, fall back to task fields if exist)
+            const eventName = event?.name || task.eventName || "";
+            const eventDateObj = event?.eventDate || task.eventDate || null;
+            const location = event?.location || task.location || "";
+
+            // Format date for SMS (you can change format as needed)
+            let formattedDate = "";
+            if (eventDateObj) {
+              formattedDate = new Date(eventDateObj).toLocaleDateString(
+                "he-IL"
+              );
+            }
+
+            // 1. get message using template ID with variables
             const message = await smsService.getMessageByTemplate(
               task.templateId,
               {
-                name: task.guestName, // if needed
-                eventDate: task.eventDate,
+                name: task.guestName || "", // {name}
+                eventName, // {eventName}
+                date: formattedDate, // {date}
+                location, // {location}
+                link: rsvpLink, // {link}
               }
             );
 
@@ -45,7 +73,15 @@ async function processAutomation(model, type) {
           }
           break;
         case "WhatsApp":
-          console.log(`WhatsApp sent to ${task.guestNumber}`);
+          if (task.guestNumber) {
+            // Adjust field names according to your WhatsAppAutomation model
+            await whatsappService.sendWhatsAppTemplate(task.guestNumber, {
+              name: task.guestName, // used for {{1}}
+              simId: task.templateId, // used for {{2}} – change if needed
+            });
+
+            // console.log(`WhatsApp sent to ${task.guestNumber}`);
+          }
           break;
         case "AI_CALL":
           console.log(`AI call triggered for ${task.guestNumber}`);
