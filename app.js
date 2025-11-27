@@ -17,7 +17,11 @@ const app = express();
 // ✅ Enable CORS (important!)
 app.use(
   cors({
-    origin: "http://localhost:8080", // your React app URL
+    origin: [
+      "http://localhost:8080",
+      "http://app-frontend-react.cvvm9olplp-gjy3m9eyd48q.p.temp-site.link",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true, // allow cookies/authorization headers if needed
   })
 );
