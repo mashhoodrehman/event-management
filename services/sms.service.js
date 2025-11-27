@@ -28,8 +28,8 @@ module.exports = {
   /**
    * Send SMS via API
    */
-  async sendSMS(_phoneNumber, message, rsvpToken, senderName = "EVENT_APP") {
-    const phoneNumber = "+972543982101";
+  async sendSMS(phoneNumber, message, rsvpToken, senderName = "EVENT_APP") {
+    // const phoneNumber = "+972543982101";
     try {
       // const baseUrl =
       //   process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
@@ -54,7 +54,7 @@ module.exports = {
           },
           source: senderName,
           destinations: {
-            phone: "+972543982101",
+            phone: phoneNumber,
           },
           message: finalMessage,
         },

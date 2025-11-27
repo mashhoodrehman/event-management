@@ -25,7 +25,7 @@ const signup = async ({ name, email, password, type }) => {
     verificationToken,
   });
 
-  const verificationLink = `http://localhost:5000/api/auth/verify?token=${verificationToken}`;
+  const verificationLink = `http://app-backend.cvvm9olplp-gjy3m9eyd48q.p.temp-site.link/api/auth/verify?token=${verificationToken}`;
 
   await transporter.sendMail({
     from: process.env.EMAIL_USER,
