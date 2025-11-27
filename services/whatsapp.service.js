@@ -22,9 +22,9 @@ module.exports = {
    * @param {string} data.name - Guest name (for {{1}})
    * @param {string} data.simId - SIM ID or any second parameter (for {{2}})
    */
-  async sendWhatsAppTemplate(_phoneNumber, { _name, simId }) {
-    const phoneNumber = "+972543982101";
-    const name = "Dor";
+  async sendWhatsAppTemplate(phoneNumber, { _name, simId }) {
+    // const phoneNumber = "+972543982101";
+    // const name = "Dor";
     try {
       const url = `${RESPOND_IO_BASE_URL}/contact/phone:${phoneNumber}/message`;
 
