@@ -4,6 +4,13 @@ const crypto = require("crypto");
 const User = require("../models/user.model");
 const transporter = require("../config/email");
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+
+function loadTemplate(fileName) {
+  const filePath = path.join(__dirname, "..", "templates", fileName);
+  return fs.readFileSync(filePath, "utf8");
+}
 
 // 🧠 Signup with email verification
 const signup = async ({ name, email, password, type }) => {
@@ -25,18 +32,26 @@ const signup = async ({ name, email, password, type }) => {
     verificationToken,
   });
 
-  const verificationLink = `http://app-backend.cvvm9olplp-gjy3m9eyd48q.p.temp-site.link/api/auth/verify?token=${verificationToken}`;
+  const verificationLink = `http://localhost:5000/api/auth/verify?token=${verificationToken}`;
+  let emailTemplate = loadTemplate("verificationEmail.html");
+
+  emailTemplate = emailTemplate
+    .replace(/{{name}}/g, name)
+    .replace(/{{type}}/g, type)
+    .replace(/{{verificationLink}}/g, verificationLink)
+    .replace(/{{year}}/g, new Date().getFullYear());
 
   await transporter.sendMail({
     from: process.env.EMAIL_USER,
     to: email,
     subject: "Verify your account",
-    html: `
-      <h2>Welcome, ${name}!</h2>
-      <p>Your account type: <b>${type}</b></p>
-      <p>Click the link below to verify your account:</p>
-      <a href="${verificationLink}" target="_blank">${verificationLink}</a>
-    `,
+    html: emailTemplate,
+    // html: `
+    //   <h2>Welcome, ${name}!</h2>
+    //   <p>Your account type: <b>${type}</b></p>
+    //   <p>Click the link below to verify your account:</p>
+    //   <a href="${verificationLink}" target="_blank">${verificationLink}</a>
+    // `,
   });
 
   return {
@@ -68,16 +83,34 @@ const login = async ({ email, password }) => {
 };
 
 // ✅ Verify account
-const verifyAccount = async (token) => {
+// const verifyAccount = async (token) => {
+//   const user = await User.findOne({ where: { verificationToken: token } });
+
+//   if (!user) throw new Error("Invalid or expired verification token");
+
+//   user.isVerified = true;
+//   user.verificationToken = null;
+//   await user.save();
+
+//   return { message: "Account verified successfully!" };
+// };
+const verifyAccount = async (token, res) => {
   const user = await User.findOne({ where: { verificationToken: token } });
 
-  if (!user) throw new Error("Invalid or expired verification token");
+  if (!user) {
+    if (!user) throw new Error("Invalid or expired verification link");
+  }
 
   user.isVerified = true;
   user.verificationToken = null;
   await user.save();
 
-  return { message: "Account verified successfully!" };
+  let successHtml = loadTemplate("verificationSuccess.html");
+  successHtml = successHtml.replace(
+    /{{loginUrl}}/g,
+    process.env.FRONTEND_LOGIN_URL
+  );
+  return successHtml;
 };
 
 // 👤 Get Profile

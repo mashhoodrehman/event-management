@@ -9,6 +9,11 @@ const Event = sequelize.define("Event", {
   eventDate: { type: DataTypes.DATE, allowNull: false }, // contains date + time
   endDate: { type: DataTypes.DATE, allowNull: false }, // contains date + time
   location: { type: DataTypes.STRING, allowNull: false },
+
+  locationName: { type: DataTypes.STRING, allowNull: true },
+  locationLat: { type: DataTypes.DECIMAL(10, 7), allowNull: true },
+  locationLng: { type: DataTypes.DECIMAL(10, 7), allowNull: true },
+
   estimatedGuests: { type: DataTypes.INTEGER, allowNull: false },
   description: { type: DataTypes.TEXT, allowNull: true },
   invitationFile: { type: DataTypes.STRING, allowNull: true },
