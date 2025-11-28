@@ -35,6 +35,15 @@ const User = sequelize.define("User", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  // 🔹 Stripe fields for saved card billing
+  stripeCustomerId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  defaultPaymentMethodId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
 });
 
 module.exports = User;
