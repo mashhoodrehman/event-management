@@ -4,6 +4,7 @@ const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/payment.model");
 const Event = require("../models/event.model");
+const User = require("../models/user.model");
 const Guest = require("../models/guest.model");
 const EventSetting = require("../models/eventSetting.model");
 const MessageTemplate = require("../models/messageTemplate.model");
@@ -14,14 +15,36 @@ const { createAutomations } = require("../services/automationScheduler");
 const processSetupFee = async (req, res) => {
   try {
     const { eventId } = req.body;
+    const userId = req.user.id;
+
     if (!eventId) return res.status(400).json({ error: "eventId is required" });
 
     // Validate event exists
     const event = await Event.findByPk(eventId);
     if (!event) return res.status(404).json({ error: "Event not found" });
+    if (event.userId !== userId)
+      return res.status(403).json({ error: "Unauthorized" });
 
-    // Check for existing payment record
-    const existingPayment = await Payment.findOne({ where: { eventId } });
+    const user = await User.findByPk(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // 🔹 Ensure Stripe customer exists
+    let stripeCustomerId = user.stripeCustomerId;
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: user.name,
+      });
+      stripeCustomerId = customer.id;
+      user.stripeCustomerId = stripeCustomerId;
+      await user.save();
+    }
+
+    // 🔹 Check for existing setup fee payment for this event
+    const existingPayment = await Payment.findOne({
+      where: { eventId, type: "setup_fee" },
+      order: [["createdAt", "DESC"]],
+    });
 
     if (existingPayment) {
       // Handle already successful payment
@@ -59,7 +82,9 @@ const processSetupFee = async (req, res) => {
       currency: "usd",
       description: `Setup fee for event #${eventId}`,
       payment_method_types: ["card"],
-      metadata: { eventId: String(eventId) },
+      customer: stripeCustomerId,
+      setup_future_usage: "off_session",
+      metadata: { eventId: String(eventId), paymentType: "setup_fee" },
     });
 
     // Save payment record
@@ -70,6 +95,7 @@ const processSetupFee = async (req, res) => {
       paymentIntentId: paymentIntent.id,
       status: "initiated",
       clientSecret: paymentIntent.client_secret, // save if needed
+      type: "setup_fee",
     });
     // // ================= SEND SMS TO GUESTS =================
     // const guests = await Guest.findAll({ where: { eventId } });
