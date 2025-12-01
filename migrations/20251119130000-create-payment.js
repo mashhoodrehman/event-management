@@ -27,7 +27,7 @@ module.exports = {
 
       currency: {
         type: Sequelize.STRING,
-        defaultValue: "usd",
+        defaultValue: "ils",
       },
 
       paymentIntentId: {

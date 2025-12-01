@@ -30,6 +30,10 @@ const AICallAutomation = sequelize.define("AICallAutomation", {
     type: DataTypes.INTEGER,
     defaultValue: 1,
   },
+  billingPaymentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 });
 
 module.exports = AICallAutomation;

@@ -74,12 +74,12 @@ const processSetupFee = async (req, res) => {
     }
 
     // Amount in cents (e.g. $100 => 10000)
-    const amount = 10000;
+    const amount = 100 * 100;
 
     // Create new PaymentIntent
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
-      currency: "usd",
+      currency: "ils",
       description: `Setup fee for event #${eventId}`,
       payment_method_types: ["card"],
       customer: stripeCustomerId,
@@ -91,7 +91,7 @@ const processSetupFee = async (req, res) => {
     await Payment.create({
       eventId,
       amount,
-      currency: "usd",
+      currency: "ils",
       paymentIntentId: paymentIntent.id,
       status: "initiated",
       clientSecret: paymentIntent.client_secret, // save if needed

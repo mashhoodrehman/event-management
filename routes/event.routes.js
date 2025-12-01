@@ -12,6 +12,7 @@ const {
   saveEventSchedule,
   getEventDetails,
   getUserEvents,
+  getEventAutomationStats,
 } = require("../controllers/event.controller");
 const {
   processSetupFee,
@@ -44,6 +45,7 @@ router.post("/setup-fee", authMiddleware, processSetupFee);
 router.get("/payments", authMiddleware, getPaymentsByEvent);
 router.get("/list", authMiddleware, getUserEvents);
 router.get("/details/:eventId", authMiddleware, getEventDetails);
+router.get("/stats/:eventId", authMiddleware, getEventAutomationStats);
 
 // router.post(
 //   "/create",

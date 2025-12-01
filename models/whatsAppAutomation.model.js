@@ -30,6 +30,10 @@ const WhatsAppAutomation = sequelize.define("WhatsAppAutomation", {
     type: DataTypes.INTEGER,
     defaultValue: 1,
   },
+  billingPaymentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 });
 
 module.exports = WhatsAppAutomation;

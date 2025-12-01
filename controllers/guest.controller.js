@@ -2,6 +2,7 @@ const { Op } = require("sequelize");
 
 const Guest = require("../models/guest.model");
 const Event = require("../models/event.model");
+const { formatTimeAgo } = require("../utils/timeAgo");
 
 /**
  * Update guest RSVP status
@@ -134,8 +135,55 @@ const getGuestsByFilters = async (req, res) => {
   }
 };
 
+const getRecentActivity = async (req, res) => {
+  try {
+    const { eventId } = req.query;
+    const userId = req.user.id; // from auth middleware
+
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // Ensure the event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    // Find latest 5 guests whose status is NOT 'pending'
+    const guests = await Guest.findAll({
+      where: {
+        eventId,
+        status: { [Op.ne]: "pending" },
+      },
+      order: [["updatedAt", "DESC"]],
+      limit: 5,
+    });
+
+    const activities = guests.map((guest) => ({
+      name: guest.name,
+      status: guest.status,
+      timeAgo: formatTimeAgo(guest.updatedAt),
+      // you can also return raw time if you want:
+      // updatedAt: guest.updatedAt,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: activities,
+    });
+  } catch (error) {
+    console.error("Error fetching recent activity:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   updateRSVPStatus,
   getGuestDetails,
   getGuestsByFilters,
+  getRecentActivity,
 };

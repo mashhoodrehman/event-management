@@ -4,6 +4,7 @@ const {
   updateRSVPStatus,
   getGuestDetails,
   getGuestsByFilters,
+  getRecentActivity,
 } = require("../controllers/guest.controller");
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -13,5 +14,7 @@ router.post("/rsvp", updateRSVPStatus);
 router.get("/details", getGuestDetails);
 
 router.get("/list", authMiddleware, getGuestsByFilters);
+
+router.get("/recent-activity", authMiddleware, getRecentActivity);
 
 module.exports = router;

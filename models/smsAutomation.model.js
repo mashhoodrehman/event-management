@@ -30,6 +30,10 @@ const SMSAutomation = sequelize.define("SMSAutomation", {
     type: DataTypes.INTEGER,
     defaultValue: 1,
   },
+  billingPaymentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 });
 
 module.exports = SMSAutomation;

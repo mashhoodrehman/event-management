@@ -30,6 +30,10 @@ const HumanCallAutomation = sequelize.define("HumanCallAutomation", {
     type: DataTypes.INTEGER,
     defaultValue: 1,
   },
+  billingPaymentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
 });
 
 module.exports = HumanCallAutomation;

@@ -7,7 +7,7 @@ const Payment = sequelize.define("Payment", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   eventId: { type: DataTypes.INTEGER, allowNull: false },
   amount: { type: DataTypes.INTEGER, allowNull: false }, // cents
-  currency: { type: DataTypes.STRING, defaultValue: "usd" },
+  currency: { type: DataTypes.STRING, defaultValue: "ils" },
   paymentIntentId: { type: DataTypes.STRING },
   // 🔹 WHAT this payment is for
   type: {

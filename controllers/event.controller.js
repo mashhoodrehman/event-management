@@ -7,6 +7,10 @@ const EventAutomationSchedule = require("../models/eventAutomationSchedule.model
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/payment.model");
+const SMSAutomation = require("../models/smsAutomation.model");
+const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
+const AICallAutomation = require("../models/aICallAutomation.model");
+const HumanCallAutomation = require("../models/humanCallAutomation.model");
 
 const xlsx = require("xlsx");
 
@@ -706,6 +710,116 @@ const getUserEvents = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
+// ====================== EVENT STATS (AUTOMATION COUNTS & COSTS) ======================
+const getEventAutomationStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { eventId } = req.params;
+
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // Verify event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    // Count how many were actually sent (status = success)
+    const [
+      smsSent,
+      whatsappSent,
+      aiCallSent,
+      humanCallSent,
+      smsAmount,
+      whatsappAmount,
+      aiCallAmount,
+      humanCallAmount,
+      setupFeeAmount,
+    ] = await Promise.all([
+      SMSAutomation.count({
+        where: { eventId, status: "success" },
+      }),
+      WhatsAppAutomation.count({
+        where: { eventId, status: "success" },
+      }),
+      AICallAutomation.count({
+        where: { eventId, status: "success" },
+      }),
+      HumanCallAutomation.count({
+        where: { eventId, status: "success" },
+      }),
+
+      // Sum of actual charges from Payment table
+      Payment.sum("amount", {
+        where: { eventId, type: "sms_fee", status: "succeeded" },
+      }),
+      Payment.sum("amount", {
+        where: { eventId, type: "whatsapp_fee", status: "succeeded" },
+      }),
+      Payment.sum("amount", {
+        where: { eventId, type: "ai_call_fee", status: "succeeded" },
+      }),
+      Payment.sum("amount", {
+        where: { eventId, type: "human_call_fee", status: "succeeded" },
+      }),
+      Payment.sum("amount", {
+        where: { eventId, type: "setup_fee", status: "succeeded" },
+      }),
+    ]);
+
+    const safeSum = (v) => (v == null ? 0 : v);
+
+    const smsAmountCents = safeSum(smsAmount);
+    const whatsappAmountCents = safeSum(whatsappAmount);
+    const aiCallAmountCents = safeSum(aiCallAmount);
+    const humanCallAmountCents = safeSum(humanCallAmount);
+    const setupFeeAmountCents = safeSum(setupFeeAmount);
+
+    const automationFeesCents =
+      smsAmountCents +
+      whatsappAmountCents +
+      aiCallAmountCents +
+      humanCallAmountCents;
+
+    const grandTotalCents = automationFeesCents + setupFeeAmountCents;
+
+    return res.status(200).json({
+      eventId: Number(eventId),
+      currency: "ils",
+      perChannel: {
+        sms: {
+          sent: smsSent,
+          amountCents: smsAmountCents,
+        },
+        whatsapp: {
+          sent: whatsappSent,
+          amountCents: whatsappAmountCents,
+        },
+        aiCall: {
+          sent: aiCallSent,
+          amountCents: aiCallAmountCents,
+        },
+        humanCall: {
+          sent: humanCallSent,
+          amountCents: humanCallAmountCents,
+        },
+      },
+      setupFeeCents: setupFeeAmountCents,
+      totals: {
+        automationFeesCents,
+        grandTotalCents,
+      },
+    });
+  } catch (error) {
+    console.error("getEventAutomationStats error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   createOrUpdateEvent,
@@ -715,6 +829,7 @@ module.exports = {
   saveEventSchedule,
   getEventDetails,
   getUserEvents,
+  getEventAutomationStats,
 };
 
 // const Event = require("../models/event.model");
