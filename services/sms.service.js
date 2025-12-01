@@ -62,20 +62,20 @@ module.exports = {
 
       console.log("📨 Sending SMS:", { phoneNumber, finalMessage });
 
-      const response = await axios.post(
-        "https://019sms.co.il/api",
-        requestBody,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.SMS_API_TOKEN}`,
-          },
-        }
-      );
+      // const response = await axios.post(
+      //   "https://019sms.co.il/api",
+      //   requestBody,
+      //   {
+      //     headers: {
+      //       "Content-Type": "application/json",
+      //       Authorization: `Bearer ${process.env.SMS_API_TOKEN}`,
+      //     },
+      //   }
+      // );
 
       return {
         success: true,
-        data: response.data,
+        // data: response.data,
       };
     } catch (error) {
       console.error("SMS API ERROR:", error.response?.data || error.message);
