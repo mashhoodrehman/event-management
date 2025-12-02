@@ -767,9 +767,9 @@ const getEventAutomationStats = async (req, res) => {
       Payment.sum("amount", {
         where: { eventId, type: "human_call_fee", status: "succeeded" },
       }),
-      Payment.sum("amount", {
-        where: { eventId, type: "setup_fee", status: "succeeded" },
-      }),
+      // Payment.sum("amount", {
+      //   where: { eventId, type: "setup_fee", status: "succeeded" },
+      // }),
     ]);
 
     const safeSum = (v) => (v == null ? 0 : v);
@@ -778,7 +778,7 @@ const getEventAutomationStats = async (req, res) => {
     const whatsappAmountCents = safeSum(whatsappAmount);
     const aiCallAmountCents = safeSum(aiCallAmount);
     const humanCallAmountCents = safeSum(humanCallAmount);
-    const setupFeeAmountCents = safeSum(setupFeeAmount);
+    // const setupFeeAmountCents = safeSum(setupFeeAmount);
 
     const automationFeesCents =
       smsAmountCents +
@@ -786,7 +786,7 @@ const getEventAutomationStats = async (req, res) => {
       aiCallAmountCents +
       humanCallAmountCents;
 
-    const grandTotalCents = automationFeesCents + setupFeeAmountCents;
+    const grandTotalCents = automationFeesCents;
 
     return res.status(200).json({
       eventId: Number(eventId),
@@ -809,7 +809,7 @@ const getEventAutomationStats = async (req, res) => {
           amountCents: humanCallAmountCents,
         },
       },
-      setupFeeCents: setupFeeAmountCents,
+      // setupFeeCents: setupFeeAmountCents,
       totals: {
         automationFeesCents,
         grandTotalCents,

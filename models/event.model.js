@@ -29,6 +29,14 @@ const Event = sequelize.define("Event", {
     ),
     defaultValue: "draft",
   },
+  // ⚡ Virtual active field — NOT stored in DB
+  active: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      const now = new Date();
+      return new Date(this.eventDate) >= now;
+    },
+  },
 });
 
 // Relationships

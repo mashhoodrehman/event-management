@@ -181,9 +181,65 @@ const getRecentActivity = async (req, res) => {
   }
 };
 
+const getGuestStats = async (req, res) => {
+  try {
+    const { eventId } = req.query;
+    const userId = req.user.id; // from auth middleware
+
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // ✅ Verify that event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    // ✅ Count guests per status
+    const [totalGuests, confirmed, cancel, hesitate, pending] =
+      await Promise.all([
+        Guest.count({ where: { eventId } }),
+        Guest.count({ where: { eventId, status: "confirmed" } }),
+        Guest.count({ where: { eventId, status: "cancel" } }),
+        Guest.count({ where: { eventId, status: "hesitate" } }),
+        Guest.count({ where: { eventId, status: "pending" } }),
+      ]);
+
+    const waiting = pending + hesitate;
+    const responded = confirmed + cancel + hesitate;
+
+    const responseRatePercent =
+      totalGuests > 0
+        ? Number(((responded / totalGuests) * 100).toFixed(1))
+        : 0;
+
+    return res.status(200).json({
+      eventId: Number(eventId),
+      totalGuests,
+      statuses: {
+        pending,
+        confirmed,
+        hesitate,
+        cancel,
+        waiting, // pending + hesitate
+      },
+      responded,
+      responseRatePercent,
+    });
+  } catch (error) {
+    console.error("getGuestStats error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   updateRSVPStatus,
   getGuestDetails,
   getGuestsByFilters,
   getRecentActivity,
+  getGuestStats,
 };

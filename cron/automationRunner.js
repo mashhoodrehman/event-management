@@ -3,6 +3,10 @@ const { Op } = require("sequelize");
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
+const fs = require("fs");
+const path = require("path");
+const transporter = require("../config/email");
+
 const SMSAutomation = require("../models/smsAutomation.model");
 const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
@@ -14,6 +18,12 @@ const EventSetting = require("../models/eventSetting.model");
 const Guest = require("../models/guest.model");
 const User = require("../models/user.model");
 const Payment = require("../models/payment.model");
+
+// ---------- Template helper ----------
+function loadTemplate(fileName) {
+  const filePath = path.join(__dirname, "..", "templates", fileName);
+  return fs.readFileSync(filePath, "utf8");
+}
 
 // Pricing (per item) in agorot (smallest unit for ILS)
 const SMS_PRICE = parseInt(process.env.SMS_PRICE_AGOROT || "15", 10);
@@ -56,6 +66,79 @@ function mapAutomationTypeToPaymentType(type) {
       return "human_call_fee";
     default:
       return "sms_fee";
+  }
+}
+function humanizeAutomationType(type) {
+  switch (type) {
+    case "SMS":
+      return "SMS";
+    case "WhatsApp":
+      return "WhatsApp";
+    case "AI_CALL":
+      return "AI Call";
+    case "HUMAN_CALL":
+      return "Human Call";
+    default:
+      return type;
+  }
+}
+
+// ---------- Email sending helper ----------
+async function sendAutomationChargeEmail({
+  user,
+  event,
+  type,
+  quantity,
+  unitPriceAgorot,
+  totalAgorot,
+  payment,
+}) {
+  try {
+    if (!user || !user.email) {
+      console.warn(
+        `Skipping charge email: user or email missing for userId=${user?.id}`
+      );
+      return;
+    }
+
+    const currency = "₪"; // for ILS
+    const unitPriceILS = (unitPriceAgorot / 100).toFixed(2);
+    const totalILS = (totalAgorot / 100).toFixed(2);
+
+    const automationTypeLabel = humanizeAutomationType(type);
+
+    const paymentDate = payment.createdAt
+      ? new Date(payment.createdAt).toLocaleString("he-IL")
+      : new Date().toLocaleString("he-IL");
+
+    let emailTemplate = loadTemplate("automationChargeEmail.html");
+
+    emailTemplate = emailTemplate
+      .replace(/{{name}}/g, user.name || "")
+      .replace(/{{eventName}}/g, event?.name || "")
+      .replace(/{{automationType}}/g, automationTypeLabel)
+      .replace(/{{quantity}}/g, String(quantity))
+      .replace(/{{unitPrice}}/g, unitPriceILS)
+      .replace(/{{total}}/g, totalILS)
+      .replace(/{{currency}}/g, currency)
+      .replace(/{{paymentId}}/g, payment.paymentIntentId || "")
+      .replace(/{{paymentDate}}/g, paymentDate)
+      .replace(/{{year}}/g, new Date().getFullYear());
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: `Automation charge for event "${
+        event?.name || ""
+      }" - ${currency}${totalILS}`,
+      html: emailTemplate,
+    });
+
+    console.log(
+      `Charge email sent to ${user.email} for payment ${payment.paymentIntentId}`
+    );
+  } catch (err) {
+    console.error("Failed to send automation charge email:", err);
   }
 }
 
@@ -137,6 +220,17 @@ async function chargeAutomationBatch(user, event, type, tasksToBill, model) {
       );
       return false;
     }
+
+    // ✅ After successful charge, send email
+    await sendAutomationChargeEmail({
+      user,
+      event,
+      type,
+      quantity: tasksToBill.length,
+      unitPriceAgorot: pricePerUnit,
+      totalAgorot: amountCents,
+      payment,
+    });
 
     // ✅ Mark all these tasks as billed with this Payment.id
     const ids = tasksToBill.map((t) => t.id);

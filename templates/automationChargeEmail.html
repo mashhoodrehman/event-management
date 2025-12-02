@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Automation Charge Receipt</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 8px;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 16px;
+      }
+      p {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        margin-bottom: 16px;
+      }
+      .summary-table th,
+      .summary-table td {
+        border: 1px solid #dddddd;
+        padding: 8px;
+        text-align: left;
+        font-size: 14px;
+      }
+      .footer {
+        font-size: 12px;
+        color: #777777;
+        margin-top: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Automation Charge Receipt</h1>
+
+      <p>Hi {{name}},</p>
+
+      <p>
+        A new charge has been made for your event
+        <strong>"{{eventName}}"</strong>.
+      </p>
+
+      <table class="summary-table">
+        <tr>
+          <th>Automation Type</th>
+          <td>{{automationType}}</td>
+        </tr>
+        <tr>
+          <th>Units Sent</th>
+          <td>{{quantity}}</td>
+        </tr>
+        <tr>
+          <th>Price per Unit</th>
+          <td>{{currency}} {{unitPrice}}</td>
+        </tr>
+        <tr>
+          <th>Total Amount</th>
+          <td><strong>{{currency}} {{total}}</strong></td>
+        </tr>
+        <tr>
+          <th>Payment ID</th>
+          <td>{{paymentId}}</td>
+        </tr>
+        <tr>
+          <th>Payment Date</th>
+          <td>{{paymentDate}}</td>
+        </tr>
+      </table>
+
+      <p>
+        If you have any questions about this charge or believe it is incorrect,
+        please contact us.
+      </p>
+
+      <p class="footer">
+        &copy; {{year}} Event Management. All rights reserved.
+      </p>
+    </div>
+  </body>
+</html>
