@@ -89,16 +89,16 @@ module.exports = {
 
       console.log("📨 Sending WhatsApp via Respond.io:", finalMessage);
 
-      // const response = await axios.post(url, requestBody, {
-      //   headers: {
-      //     "Content-Type": "application/json",
-      //     Authorization: `Bearer ${RESPOND_IO_API_TOKEN}`,
-      //   },
-      // });
+      const response = await axios.post(url, requestBody, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${RESPOND_IO_API_TOKEN}`,
+        },
+      });
 
       return {
         success: true,
-        // data: response.data,
+        data: response.data,
       };
     } catch (error) {
       console.error(
