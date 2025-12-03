@@ -13,6 +13,7 @@ const {
   getEventDetails,
   getUserEvents,
   getEventAutomationStats,
+  getChannelResponseRates,
 } = require("../controllers/event.controller");
 const {
   processSetupFee,
@@ -46,6 +47,11 @@ router.get("/payments", authMiddleware, getPaymentsByEvent);
 router.get("/list", authMiddleware, getUserEvents);
 router.get("/details/:eventId", authMiddleware, getEventDetails);
 router.get("/stats/:eventId", authMiddleware, getEventAutomationStats);
+router.get(
+  "/channel-response/:eventId",
+  authMiddleware,
+  getChannelResponseRates
+);
 
 // router.post(
 //   "/create",

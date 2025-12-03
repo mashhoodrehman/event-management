@@ -410,10 +410,36 @@ async function processAutomation(model, type) {
           }
 
           case "WhatsApp": {
-            await whatsappService.sendWhatsAppTemplate(task.guestNumber, {
-              name: guest?.name,
-              simId: task.templateId, // adjust if your template uses something else
-            });
+            const baseUrl =
+              process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
+            const rsvpLink = `${baseUrl}?token=${task.rsvpToken}`;
+
+            const eventName = event?.name || "";
+            const eventDateObj = event?.eventDate || null;
+            const location = event?.location || "";
+
+            let formattedDate = "";
+            if (eventDateObj) {
+              formattedDate = new Date(eventDateObj).toLocaleDateString(
+                "he-IL"
+              );
+            }
+
+            const message = await smsService.getMessageByTemplate(
+              task.templateId,
+              {
+                name: guest?.name || "",
+                eventName,
+                date: formattedDate,
+                location,
+                link: rsvpLink,
+              }
+            );
+            await whatsappService.sendWhatsAppTemplate(
+              task.guestNumber,
+              message,
+              task.rsvpToken
+            );
             console.log(`WhatsApp sent to ${task.guestNumber}`);
             break;
           }

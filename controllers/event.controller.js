@@ -820,6 +820,101 @@ const getEventAutomationStats = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+// ====================== EVENT CHANNEL RESPONSE RATES ======================
+/**
+ * For a given event, calculate response rate per channel:
+ * - "Reached" = guests who had at least one successful automation of that type
+ * - "Responded" = reached guests whose status != "pending"
+ * - responseRatePercent = responded / totalGuests * 100  ✅
+ *
+ * GET /api/event/channel-response/:eventId
+ */
+const getChannelResponseRates = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { eventId } = req.params;
+
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // Verify event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    // Load all guests
+    const guests = await Guest.findAll({
+      where: { eventId },
+      attributes: ["id", "rsvpToken", "status"],
+    });
+
+    const totalGuests = guests.length;
+    const guestByToken = new Map(
+      guests.map((g) => [g.rsvpToken, { id: g.id, status: g.status }])
+    );
+
+    // Helper for channel stats
+    async function computeChannelStats(model, type) {
+      const tasks = await model.findAll({
+        where: { eventId, status: "success" },
+        attributes: ["rsvpToken"],
+      });
+
+      if (!tasks.length || totalGuests === 0) {
+        return {
+          type,
+          reached: 0,
+          responded: 0,
+          responseRatePercent: 0,
+        };
+      }
+
+      const tokenSet = new Set(tasks.map((t) => t.rsvpToken));
+
+      let reached = 0;
+      let responded = 0;
+
+      for (const token of tokenSet) {
+        const guest = guestByToken.get(token);
+        if (!guest) continue;
+
+        reached += 1;
+
+        if (guest.status !== "pending") {
+          responded += 1;
+        }
+      }
+
+      const responseRatePercent = Number(
+        ((responded / totalGuests) * 100).toFixed(1)
+      );
+
+      return {
+        type,
+        reached,
+        responded,
+        responseRatePercent,
+      };
+    }
+
+    const results = await Promise.all([
+      computeChannelStats(SMSAutomation, "sms"),
+      computeChannelStats(WhatsAppAutomation, "whatsapp"),
+      computeChannelStats(AICallAutomation, "ai_call"),
+      computeChannelStats(HumanCallAutomation, "human_call"),
+    ]);
+
+    return res.status(200).json(results);
+  } catch (error) {
+    console.error("getChannelResponseRates error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 module.exports = {
   createOrUpdateEvent,
@@ -830,6 +925,7 @@ module.exports = {
   getEventDetails,
   getUserEvents,
   getEventAutomationStats,
+  getChannelResponseRates,
 };
 
 // const Event = require("../models/event.model");
