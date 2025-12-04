@@ -23,7 +23,6 @@ const createOrUpdateEvent = async (req, res) => {
       name,
       typeId,
       eventDate,
-      endDate,
       location,
       locationName,
       locationLat,
@@ -51,30 +50,30 @@ const createOrUpdateEvent = async (req, res) => {
     const today = toStartOfDay(new Date());
     const eventDateTime = new Date(eventDate);
     const eventDateObj = toStartOfDay(eventDateTime);
-    let endDateObj = endDate ? toStartOfDay(endDate) : null;
+    // let endDateObj = endDate ? toStartOfDay(endDate) : null;
 
     // Event must be at least 6 days after today (calendar days)
     const daysFromTodayToEvent = diffInDays(today, eventDateObj);
 
-    if (daysFromTodayToEvent < 6) {
+    if (daysFromTodayToEvent < 3) {
       return res
         .status(400)
-        .json({ error: "Event date must be at least 6 days after today" });
+        .json({ error: "Event date must be at least 3 days after today" });
     }
 
     // Default end date = exactly 3 days before event date if not provided
-    if (!endDateObj) {
-      endDateObj = new Date(eventDateObj);
-      endDateObj.setDate(endDateObj.getDate() - 3);
-    }
+    // if (!endDateObj) {
+    //   endDateObj = new Date(eventDateObj);
+    //   endDateObj.setDate(endDateObj.getDate() - 3);
+    // }
 
-    const daysFromTodayToEnd = diffInDays(today, endDateObj);
+    // const daysFromTodayToEnd = diffInDays(today, endDateObj);
 
-    if (daysFromTodayToEnd < 3) {
-      return res.status(400).json({
-        error: "End date must be at least 3 days after today",
-      });
-    }
+    // if (daysFromTodayToEnd < 3) {
+    //   return res.status(400).json({
+    //     error: "End date must be at least 3 days after today",
+    //   });
+    // }
 
     // End date must be before event date
     // if (endDateObj >= eventDateObj) {
@@ -84,18 +83,18 @@ const createOrUpdateEvent = async (req, res) => {
     // }
 
     // End date must be at least 3 full days before event date
-    const daysFromEndToEvent = diffInDays(endDateObj, eventDateObj);
+    // const daysFromEndToEvent = diffInDays(endDateObj, eventDateObj);
 
-    if (daysFromEndToEvent < 3) {
-      return res.status(400).json({
-        error: "End date must be at least 3 days before event date",
-      });
-    }
-    if (endDateObj >= eventDateObj) {
-      return res
-        .status(400)
-        .json({ error: "End date cannot be on or after the event date" });
-    }
+    // if (daysFromEndToEvent < 3) {
+    //   return res.status(400).json({
+    //     error: "End date must be at least 3 days before event date",
+    //   });
+    // }
+    // if (endDateObj >= eventDateObj) {
+    //   return res
+    //     .status(400)
+    //     .json({ error: "End date cannot be on or after the event date" });
+    // }
 
     const invitationFile = req.file ? req.file.filename : null;
     let event;
@@ -108,7 +107,6 @@ const createOrUpdateEvent = async (req, res) => {
         name,
         typeId,
         eventDate: eventDateTime,
-        endDate: endDateObj,
         location,
         locationName: locationName || event.locationName,
         locationLat: locationLat ?? event.locationLat,
@@ -124,7 +122,6 @@ const createOrUpdateEvent = async (req, res) => {
         name,
         typeId,
         eventDate: eventDateTime,
-        endDate: endDateObj,
         location,
         locationName,
         locationLat,

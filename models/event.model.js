@@ -7,7 +7,7 @@ const Event = sequelize.define("Event", {
   name: { type: DataTypes.STRING, allowNull: false },
   typeId: { type: DataTypes.INTEGER, allowNull: false },
   eventDate: { type: DataTypes.DATE, allowNull: false }, // contains date + time
-  endDate: { type: DataTypes.DATE, allowNull: false }, // contains date + time
+  // endDate: { type: DataTypes.DATE, allowNull: false }, // contains date + time
   location: { type: DataTypes.STRING, allowNull: false },
 
   locationName: { type: DataTypes.STRING, allowNull: true },
