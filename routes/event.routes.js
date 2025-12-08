@@ -8,8 +8,9 @@ const {
   createOrUpdateEvent,
   addOrUpdateGuests,
   updateEventSettings,
+  updateAutomationSettings,
   saveMessageTemplate,
-
+  getEventAutomationSteps,
   getEventDetails,
   getUserEvents,
   getEventAutomationStats,
@@ -39,6 +40,7 @@ router.post(
 
 // Step 3: Event Settings
 router.post("/automations", authMiddleware, updateEventSettings);
+router.post("/settings", authMiddleware, updateAutomationSettings);
 
 router.post("/message-template", authMiddleware, saveMessageTemplate);
 // router.post("/automation-schedule", authMiddleware, saveEventSchedule);
@@ -47,6 +49,11 @@ router.get("/payments", authMiddleware, getPaymentsByEvent);
 router.get("/list", authMiddleware, getUserEvents);
 router.get("/details/:eventId", authMiddleware, getEventDetails);
 router.get("/stats/:eventId", authMiddleware, getEventAutomationStats);
+router.get(
+  "/automation-steps/:eventId",
+  authMiddleware,
+  getEventAutomationSteps
+);
 router.get(
   "/channel-response/:eventId",
   authMiddleware,
