@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const crypto = require("crypto");
 const Event = require("../models/event.model");
 const Guest = require("../models/guest.model");
@@ -11,6 +12,7 @@ const SMSAutomation = require("../models/smsAutomation.model");
 const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
+const { createAutomations } = require("../services/automationScheduler2");
 
 const xlsx = require("xlsx");
 
@@ -554,6 +556,118 @@ const updateEventSettings = async (req, res) => {
 //   }
 // };
 
+const updateAutomationSettings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { eventId, steps = [] } = req.body;
+
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // ensure event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    const now = new Date();
+    const todayKey = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+    // ✅ validate: user can only send future steps (runDate > today)
+    const invalid = steps.filter(
+      (s) => !s.runDate || s.runDate < todayKey || !s.baseType
+    );
+    if (invalid.length > 0) {
+      return res.status(400).json({
+        error:
+          "You can edit or delete only future automations (after today). Past or in-progress automations cannot be modified.",
+      });
+    }
+
+    // ✅ remove only FUTURE EventSetting rows for this event
+    await EventSetting.destroy({
+      where: {
+        eventId,
+        executionDate: { [Op.gt]: todayKey },
+      },
+    });
+
+    // ✅ insert the new FUTURE steps
+    const normalizeBaseType = (baseType) => {
+      if (!baseType) return null;
+      return baseType; // already "sms" | "whatsapp" | "ai_call" | "human_call"
+    };
+
+    const stepRows = steps.map((s) => ({
+      eventId,
+      baseType: normalizeBaseType(s.baseType),
+      executionDate: s.runDate, // "YYYY-MM-DD"
+      stepOrder: s.order ?? 1,
+      rounds: s.rounds || 1,
+      name: s.name || null,
+    }));
+
+    if (stepRows.length === 0) {
+      // if user deleted all future steps, that's allowed → no more future automations
+      // but we still need to clear future tasks
+      console.log(`All future automations removed for event ${eventId}`);
+    } else {
+      await EventSetting.bulkCreate(stepRows);
+    }
+
+    // ✅ delete FUTURE pending automation tasks & let queue no-op on old jobs
+    const todayStart = new Date(todayKey);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    // We consider "future" tasks as those scheduled from tomorrow onward.
+    const futureWhere = {
+      eventId,
+      status: "pending",
+      scheduledAt: { [Op.gte]: tomorrowStart },
+    };
+
+    await Promise.all([
+      SMSAutomation.destroy({ where: futureWhere }),
+      WhatsAppAutomation.destroy({ where: futureWhere }),
+      AICallAutomation.destroy({ where: futureWhere }),
+      HumanCallAutomation.destroy({ where: futureWhere }),
+    ]);
+
+    // ✅ regenerate tasks only for FUTURE steps
+    // (createAutomations will only schedule future ones; see next section)
+    const guests = await Guest.findAll({ where: { eventId } });
+    const template = await MessageTemplate.findOne({ where: { eventId } });
+
+    const templates = {
+      smsTemplateId: template?.id || null,
+      whatsappTemplateId: template?.id || null,
+      aiCallTemplateId: template?.id || null,
+      humanCallTemplateId: template?.id || null,
+    };
+
+    await createAutomations(event, guests, templates);
+
+    // optional: keep step3_completed
+    await event.update({ status: "step3_completed" });
+
+    return res.status(200).json({
+      message: "Future automation steps updated successfully",
+      stepsSaved: stepRows.length,
+    });
+  } catch (err) {
+    console.error("updateAutomationSettings error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Server error while saving steps" });
+  }
+};
+
 const saveMessageTemplate = async (req, res) => {
   try {
     const { eventId, messageBody } = req.body;
@@ -973,6 +1087,73 @@ const getChannelResponseRates = async (req, res) => {
   }
 };
 
+const getEventAutomationSteps = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { eventId } = req.params;
+
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // ensure event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    const steps = await EventSetting.findAll({
+      where: { eventId },
+      order: [
+        ["executionDate", "ASC"],
+        ["stepOrder", "ASC"],
+        ["id", "ASC"],
+      ],
+    });
+
+    const now = new Date();
+    const todayKey = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+    const formatted = steps.map((s) => {
+      const dateKey =
+        typeof s.executionDate === "string"
+          ? s.executionDate
+          : s.executionDate.toISOString().slice(0, 10);
+
+      let status;
+      if (dateKey < todayKey) status = "completed";
+      else if (dateKey === todayKey) status = "in_progress";
+      else status = "upcoming";
+
+      const canEdit = status === "upcoming";
+      const canDelete = status === "upcoming";
+
+      return {
+        id: s.id,
+        baseType: s.baseType, // "sms" | "whatsapp" | "ai_call" | "human_call"
+        runDate: dateKey, // what your frontend calls runDate
+        order: s.stepOrder,
+        rounds: s.rounds,
+        name: s.name,
+        status, // "completed" | "in_progress" | "upcoming"
+        canEdit,
+        canDelete,
+      };
+    });
+
+    return res.status(200).json({
+      eventId: Number(eventId),
+      steps: formatted,
+    });
+  } catch (err) {
+    console.error("getEventAutomationSteps error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   createOrUpdateEvent,
   addOrUpdateGuests,
@@ -982,6 +1163,8 @@ module.exports = {
   getUserEvents,
   getEventAutomationStats,
   getChannelResponseRates,
+  getEventAutomationSteps,
+  updateAutomationSettings,
 };
 
 // const Event = require("../models/event.model");
