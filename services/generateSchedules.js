@@ -17,6 +17,7 @@
  */
 
 const PER_TASK_DELAY_MS = 4 * 1000; // 4 seconds
+const FIRST_TASK_DELAY_TODAY_MS = 60 * 1000; // 1 minute delay for first task when date is today
 
 function mapBaseTypeToKey(baseType) {
   switch (baseType) {
@@ -93,8 +94,10 @@ function generateSchedules({ guests, steps, templates, eventId }) {
     // 🔹 If the step date is today → start from "now" (current time)
     if (dateKey === todayKey) {
       dateStart = new Date(now);
-      // (optional) remove ms jitter
       dateStart.setMilliseconds(0);
+      dateStart = new Date(dateStart.getTime() + FIRST_TASK_DELAY_TODAY_MS);
+      // (optional) remove ms jitter
+      // dateStart.setMilliseconds(0);
     } else {
       // Other dates → midnight of that date
       dateStart = new Date(dateKey); // 00:00 of that day (local time for this server)
