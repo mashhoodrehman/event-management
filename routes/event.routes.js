@@ -9,7 +9,7 @@ const {
   addOrUpdateGuests,
   updateEventSettings,
   saveMessageTemplate,
-  saveEventSchedule,
+
   getEventDetails,
   getUserEvents,
   getEventAutomationStats,
@@ -41,7 +41,7 @@ router.post(
 router.post("/automations", authMiddleware, updateEventSettings);
 
 router.post("/message-template", authMiddleware, saveMessageTemplate);
-router.post("/automation-schedule", authMiddleware, saveEventSchedule);
+// router.post("/automation-schedule", authMiddleware, saveEventSchedule);
 router.post("/setup-fee", authMiddleware, processSetupFee);
 router.get("/payments", authMiddleware, getPaymentsByEvent);
 router.get("/list", authMiddleware, getUserEvents);

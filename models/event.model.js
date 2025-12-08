@@ -24,7 +24,6 @@ const Event = sequelize.define("Event", {
       "step2_completed",
       "step3_completed",
       "step4_completed",
-      "step5_completed",
       "completed"
     ),
     defaultValue: "draft",

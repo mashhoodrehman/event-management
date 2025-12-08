@@ -324,175 +324,235 @@ const addOrUpdateGuests = async (req, res) => {
 // ====================== STEP 3 ======================
 const updateEventSettings = async (req, res) => {
   try {
-    const {
-      eventId,
-      smsService,
-      whatsappService,
-      aiCallService,
-      humanCallService,
-      automaticSending,
-      automaticPause,
-      smsRounds = 1,
-      smsExecutionDays = 0,
-      whatsappRounds = 1,
-      whatsappExecutionDays = 0,
-      aiCallRounds = 1,
-      aiCallExecutionDays = 0,
-      humanCallRounds = 1,
-      humanCallExecutionDays = 0,
-    } = req.body;
+    const { eventId, steps = [] } = req.body;
 
-    // ✅ Check event
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // ✅ ensure event exists
     const event = await Event.findByPk(eventId);
-    if (!event) return res.status(404).json({ error: "Event not found" });
-
-    const toStartOfDay = (date) => {
-      const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-      return d;
-    };
-
-    const diffInDays = (from, to) => {
-      const msPerDay = 1000 * 60 * 60 * 24;
-      return Math.floor((toStartOfDay(to) - toStartOfDay(from)) / msPerDay);
-    };
-
-    const today = toStartOfDay(new Date());
-    const eventDateObj = toStartOfDay(event.eventDate);
-    const endDateObj = event.endDate
-      ? toStartOfDay(event.endDate)
-      : eventDateObj;
-
-    // Use the automation end date if it exists
-    const lastAutomationDay = endDateObj;
-
-    // const eventDate = new Date(event.eventDate);
-    // const today = new Date();
-
-    // const totalDaysAvailable = Math.floor(
-    //   (eventDate - today) / (1000 * 60 * 60 * 24)
-    // );
-    // console.log(totalDaysAvailable, "mmmmmmmr");
-
-    const totalDaysAvailable = diffInDays(today, lastAutomationDay);
-
-    // if (totalDaysAvailable < 6) {
-    //   return res.status(400).json({
-    //     error:
-    //       "Event date must be at least 6 days after today to schedule automations.",
-    //   });
-    // }
-
-    // ✅ Define automation priorities
-    const automations = [
-      smsService && {
-        type: "SMS",
-        executionDays: smsExecutionDays,
-        rounds: smsRounds,
-        priority: 1,
-      },
-      whatsappService && {
-        type: "WhatsApp",
-        executionDays: whatsappExecutionDays,
-        rounds: whatsappRounds,
-        priority: 2,
-      },
-      aiCallService && {
-        type: "AI Call",
-        executionDays: aiCallExecutionDays,
-        rounds: aiCallRounds,
-        priority: 3,
-      },
-      humanCallService && {
-        type: "Human Call",
-        executionDays: humanCallExecutionDays,
-        rounds: humanCallRounds,
-        priority: 4,
-      },
-    ].filter(Boolean);
-
-    // ✅ Check each automation fits in available days
-    for (const auto of automations) {
-      const requiredDays = auto.executionDays + (auto.rounds - 1);
-      if (requiredDays > totalDaysAvailable) {
-        return res.status(400).json({
-          error: `Not enough days to execute ${auto.type} automation — reduce execution days or rounds. Only ${totalDaysAvailable} days available before event.`,
-        });
-      }
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
     }
 
-    // ✅ Enforce correct priority order
-    // Loop through automations by priority (SMS=1 → Human Call=4)
-    automations.sort((a, b) => a.priority - b.priority);
+    // optional: normalize baseType if your frontend sends "whatsapp" instead of "whatsapp1"
+    const normalizeBaseType = (baseType) => {
+      if (!baseType) return null;
+      // if your frontend uses "whatsapp", remove this mapping
+      if (baseType === "whatsapp") return "whatsapp";
+      return baseType;
+    };
 
-    for (let i = 0; i < automations.length; i++) {
-      const current = automations[i];
-      for (let j = i + 1; j < automations.length; j++) {
-        const next = automations[j];
+    // ✅ delete old steps for this event
+    await EventSetting.destroy({ where: { eventId } });
 
-        // Next automation cannot start before current
-        if (next.executionDays < current.executionDays) {
-          return res.status(400).json({
-            error: `${next.type} cannot execute before ${current.type}. Follow order: SMS → WhatsApp → AI Call → Human Call.`,
-          });
-        }
-      }
-    }
+    // ✅ prepare new rows
+    const stepRows = steps
+      .filter((s) => s.runDate && s.baseType) // ignore incomplete ones
+      .map((s) => ({
+        eventId,
+        baseType: normalizeBaseType(s.baseType),
+        executionDate: s.runDate, // "YYYY-MM-DD"
+        stepOrder: s.order ?? 1,
+        rounds: s.rounds || 1,
+        name: s.name || null,
+      }));
 
-    // ✅ Save or update settings
-    const [settings, created] = await EventSetting.findOrCreate({
-      where: { eventId },
-      defaults: {
-        smsService,
-        whatsappService,
-        aiCallService,
-        humanCallService,
-        automaticSending,
-        automaticPause,
-        smsRounds,
-        smsExecutionDays,
-        whatsappRounds,
-        whatsappExecutionDays,
-        aiCallRounds,
-        aiCallExecutionDays,
-        humanCallRounds,
-        humanCallExecutionDays,
-      },
-    });
-
-    if (!created) {
-      await settings.update({
-        smsService,
-        whatsappService,
-        aiCallService,
-        humanCallService,
-        automaticSending,
-        automaticPause,
-        smsRounds,
-        smsExecutionDays,
-        whatsappRounds,
-        whatsappExecutionDays,
-        aiCallRounds,
-        aiCallExecutionDays,
-        humanCallRounds,
-        humanCallExecutionDays,
+    if (stepRows.length === 0) {
+      return res.status(400).json({
+        error: "No valid automation steps provided",
       });
     }
 
-    // ✅ Mark step as completed
+    // ✅ bulk insert all steps
+    await EventSetting.bulkCreate(stepRows);
+
+    // optional: mark wizard step as completed
     await event.update({ status: "step3_completed" });
 
-    res.status(200).json({
-      message: created
-        ? "Event settings created successfully"
-        : "Event settings updated successfully",
-      settings,
+    return res.status(200).json({
+      message: "Automation steps saved successfully",
+      stepsSaved: stepRows.length,
     });
   } catch (err) {
-    console.error("Step 3 Error:", err);
-    res.status(400).json({ error: err.message || "Server error" });
+    console.error("EventSetting error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Server error while saving steps" });
   }
 };
+// const updateEventSettings = async (req, res) => {
+//   try {
+//     const {
+//       eventId,
+//       smsService,
+//       whatsappService,
+//       aiCallService,
+//       humanCallService,
+//       automaticSending,
+//       automaticPause,
+//       smsRounds = 1,
+//       smsExecutionDays = 0,
+//       whatsappRounds = 1,
+//       whatsappExecutionDays = 0,
+//       aiCallRounds = 1,
+//       aiCallExecutionDays = 0,
+//       humanCallRounds = 1,
+//       humanCallExecutionDays = 0,
+//     } = req.body;
+
+//     // ✅ Check event
+//     const event = await Event.findByPk(eventId);
+//     if (!event) return res.status(404).json({ error: "Event not found" });
+
+//     const toStartOfDay = (date) => {
+//       const d = new Date(date);
+//       d.setHours(0, 0, 0, 0);
+//       return d;
+//     };
+
+//     const diffInDays = (from, to) => {
+//       const msPerDay = 1000 * 60 * 60 * 24;
+//       return Math.floor((toStartOfDay(to) - toStartOfDay(from)) / msPerDay);
+//     };
+
+//     const today = toStartOfDay(new Date());
+//     const eventDateObj = toStartOfDay(event.eventDate);
+//     const endDateObj = event.endDate
+//       ? toStartOfDay(event.endDate)
+//       : eventDateObj;
+
+//     // Use the automation end date if it exists
+//     const lastAutomationDay = endDateObj;
+
+//     // const eventDate = new Date(event.eventDate);
+//     // const today = new Date();
+
+//     // const totalDaysAvailable = Math.floor(
+//     //   (eventDate - today) / (1000 * 60 * 60 * 24)
+//     // );
+//     // console.log(totalDaysAvailable, "mmmmmmmr");
+
+//     const totalDaysAvailable = diffInDays(today, lastAutomationDay);
+
+//     // if (totalDaysAvailable < 6) {
+//     //   return res.status(400).json({
+//     //     error:
+//     //       "Event date must be at least 6 days after today to schedule automations.",
+//     //   });
+//     // }
+
+//     // ✅ Define automation priorities
+//     const automations = [
+//       smsService && {
+//         type: "SMS",
+//         executionDays: smsExecutionDays,
+//         rounds: smsRounds,
+//         priority: 1,
+//       },
+//       whatsappService && {
+//         type: "WhatsApp",
+//         executionDays: whatsappExecutionDays,
+//         rounds: whatsappRounds,
+//         priority: 2,
+//       },
+//       aiCallService && {
+//         type: "AI Call",
+//         executionDays: aiCallExecutionDays,
+//         rounds: aiCallRounds,
+//         priority: 3,
+//       },
+//       humanCallService && {
+//         type: "Human Call",
+//         executionDays: humanCallExecutionDays,
+//         rounds: humanCallRounds,
+//         priority: 4,
+//       },
+//     ].filter(Boolean);
+
+//     // ✅ Check each automation fits in available days
+//     for (const auto of automations) {
+//       const requiredDays = auto.executionDays + (auto.rounds - 1);
+//       if (requiredDays > totalDaysAvailable) {
+//         return res.status(400).json({
+//           error: `Not enough days to execute ${auto.type} automation — reduce execution days or rounds. Only ${totalDaysAvailable} days available before event.`,
+//         });
+//       }
+//     }
+
+//     // ✅ Enforce correct priority order
+//     // Loop through automations by priority (SMS=1 → Human Call=4)
+//     automations.sort((a, b) => a.priority - b.priority);
+
+//     for (let i = 0; i < automations.length; i++) {
+//       const current = automations[i];
+//       for (let j = i + 1; j < automations.length; j++) {
+//         const next = automations[j];
+
+//         // Next automation cannot start before current
+//         if (next.executionDays < current.executionDays) {
+//           return res.status(400).json({
+//             error: `${next.type} cannot execute before ${current.type}. Follow order: SMS → WhatsApp → AI Call → Human Call.`,
+//           });
+//         }
+//       }
+//     }
+
+//     // ✅ Save or update settings
+//     const [settings, created] = await EventSetting.findOrCreate({
+//       where: { eventId },
+//       defaults: {
+//         smsService,
+//         whatsappService,
+//         aiCallService,
+//         humanCallService,
+//         automaticSending,
+//         automaticPause,
+//         smsRounds,
+//         smsExecutionDays,
+//         whatsappRounds,
+//         whatsappExecutionDays,
+//         aiCallRounds,
+//         aiCallExecutionDays,
+//         humanCallRounds,
+//         humanCallExecutionDays,
+//       },
+//     });
+
+//     if (!created) {
+//       await settings.update({
+//         smsService,
+//         whatsappService,
+//         aiCallService,
+//         humanCallService,
+//         automaticSending,
+//         automaticPause,
+//         smsRounds,
+//         smsExecutionDays,
+//         whatsappRounds,
+//         whatsappExecutionDays,
+//         aiCallRounds,
+//         aiCallExecutionDays,
+//         humanCallRounds,
+//         humanCallExecutionDays,
+//       });
+//     }
+
+//     // ✅ Mark step as completed
+//     await event.update({ status: "step3_completed" });
+
+//     res.status(200).json({
+//       message: created
+//         ? "Event settings created successfully"
+//         : "Event settings updated successfully",
+//       settings,
+//     });
+//   } catch (err) {
+//     console.error("Step 3 Error:", err);
+//     res.status(400).json({ error: err.message || "Server error" });
+//   }
+// };
 
 const saveMessageTemplate = async (req, res) => {
   try {
@@ -520,126 +580,126 @@ const saveMessageTemplate = async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 };
-const saveEventSchedule = async (req, res) => {
-  try {
-    const { eventId, startDateTime } = req.body;
+// const saveEventSchedule = async (req, res) => {
+//   try {
+//     const { eventId, startDateTime } = req.body;
 
-    // ✅ Validate required fields
-    if (!eventId || !startDateTime) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
+//     // ✅ Validate required fields
+//     if (!eventId || !startDateTime) {
+//       return res.status(400).json({ error: "Missing required fields" });
+//     }
 
-    const event = await Event.findByPk(eventId);
-    if (!event) return res.status(404).json({ error: "Event not found" });
+//     const event = await Event.findByPk(eventId);
+//     if (!event) return res.status(404).json({ error: "Event not found" });
 
-    const settings = await EventSetting.findOne({ where: { eventId } });
-    if (!settings) {
-      return res.status(400).json({
-        error: "Please complete automation settings before scheduling.",
-      });
-    }
+//     const settings = await EventSetting.findOne({ where: { eventId } });
+//     if (!settings) {
+//       return res.status(400).json({
+//         error: "Please complete automation settings before scheduling.",
+//       });
+//     }
 
-    // 🔹 Helpers: work in calendar days (ignore time) for all rules
-    const toStartOfDay = (date) => {
-      const d = new Date(date);
-      d.setHours(0, 0, 0, 0);
-      return d;
-    };
+//     // 🔹 Helpers: work in calendar days (ignore time) for all rules
+//     const toStartOfDay = (date) => {
+//       const d = new Date(date);
+//       d.setHours(0, 0, 0, 0);
+//       return d;
+//     };
 
-    const diffInDays = (from, to) => {
-      const msPerDay = 1000 * 60 * 60 * 24;
-      return Math.floor((toStartOfDay(to) - toStartOfDay(from)) / msPerDay);
-    };
+//     const diffInDays = (from, to) => {
+//       const msPerDay = 1000 * 60 * 60 * 24;
+//       return Math.floor((toStartOfDay(to) - toStartOfDay(from)) / msPerDay);
+//     };
 
-    // 🔹 Full objects (with time)
-    const eventDateTime = new Date(event.eventDate);
-    const startDateTimeObj = new Date(startDateTime);
+//     // 🔹 Full objects (with time)
+//     const eventDateTime = new Date(event.eventDate);
+//     const startDateTimeObj = new Date(startDateTime);
 
-    // 🔹 Date-only versions for validation
-    const eventDateDay = toStartOfDay(eventDateTime);
-    const startDateDay = toStartOfDay(startDateTimeObj);
+//     // 🔹 Date-only versions for validation
+//     const eventDateDay = toStartOfDay(eventDateTime);
+//     const startDateDay = toStartOfDay(startDateTimeObj);
 
-    // 🔹 Decide what is the "last automation day":
-    //     prefer endDate (automation end), fall back to eventDate
-    const endDateDay = event.endDate
-      ? toStartOfDay(event.endDate)
-      : eventDateDay;
+//     // 🔹 Decide what is the "last automation day":
+//     //     prefer endDate (automation end), fall back to eventDate
+//     const endDateDay = event.endDate
+//       ? toStartOfDay(event.endDate)
+//       : eventDateDay;
 
-    // start must be strictly before the event date (business rule)
-    if (startDateDay >= eventDateDay) {
-      return res.status(400).json({
-        error: "Automation start date must be before the event date.",
-      });
-    }
+//     // start must be strictly before the event date (business rule)
+//     if (startDateDay >= eventDateDay) {
+//       return res.status(400).json({
+//         error: "Automation start date must be before the event date.",
+//       });
+//     }
 
-    // Also make sure start is not after the automation end date
-    if (startDateDay > endDateDay) {
-      return res.status(400).json({
-        error:
-          "Automation start date must be on or before the automation end date.",
-      });
-    }
+//     // Also make sure start is not after the automation end date
+//     if (startDateDay > endDateDay) {
+//       return res.status(400).json({
+//         error:
+//           "Automation start date must be on or before the automation end date.",
+//       });
+//     }
 
-    // ✅ Calculate total required days based on all automations
-    const automations = [
-      settings.smsService && {
-        type: "SMS",
-        days: settings.smsExecutionDays + (settings.smsRounds - 1),
-      },
-      settings.whatsappService && {
-        type: "WhatsApp",
-        days: settings.whatsappExecutionDays + (settings.whatsappRounds - 1),
-      },
-      settings.aiCallService && {
-        type: "AI Call",
-        days: settings.aiCallExecutionDays + (settings.aiCallRounds - 1),
-      },
-      settings.humanCallService && {
-        type: "Human Call",
-        days: settings.humanCallExecutionDays + (settings.humanCallRounds - 1),
-      },
-    ].filter(Boolean);
+//     // ✅ Calculate total required days based on all automations
+//     const automations = [
+//       settings.smsService && {
+//         type: "SMS",
+//         days: settings.smsExecutionDays + (settings.smsRounds - 1),
+//       },
+//       settings.whatsappService && {
+//         type: "WhatsApp",
+//         days: settings.whatsappExecutionDays + (settings.whatsappRounds - 1),
+//       },
+//       settings.aiCallService && {
+//         type: "AI Call",
+//         days: settings.aiCallExecutionDays + (settings.aiCallRounds - 1),
+//       },
+//       settings.humanCallService && {
+//         type: "Human Call",
+//         days: settings.humanCallExecutionDays + (settings.humanCallRounds - 1),
+//       },
+//     ].filter(Boolean);
 
-    const maxRequiredDays = Math.max(...automations.map((a) => a.days), 0);
+//     const maxRequiredDays = Math.max(...automations.map((a) => a.days), 0);
 
-    // 🔹 Days available for automations:
-    // from startDateDay (inclusive) until endDateDay (exclusive of event day)
-    const diffDays = diffInDays(startDateDay, endDateDay);
+//     // 🔹 Days available for automations:
+//     // from startDateDay (inclusive) until endDateDay (exclusive of event day)
+//     const diffDays = diffInDays(startDateDay, endDateDay);
 
-    if (diffDays < maxRequiredDays) {
-      return res.status(400).json({
-        error: `Not enough days to execute automation — increase start date or reduce automation days.`,
-      });
-    }
+//     if (diffDays < maxRequiredDays) {
+//       return res.status(400).json({
+//         error: `Not enough days to execute automation — increase start date or reduce automation days.`,
+//       });
+//     }
 
-    // ✅ Check if schedule already exists for this event
-    const existing = await EventAutomationSchedule.findOne({
-      where: { eventId },
-    });
+//     // ✅ Check if schedule already exists for this event
+//     const existing = await EventAutomationSchedule.findOne({
+//       where: { eventId },
+//     });
 
-    if (existing) {
-      // ✅ Update existing schedule
-      await existing.update({ startDateTime: startDateTimeObj });
-    } else {
-      // ✅ Create new schedule
-      await EventAutomationSchedule.create({
-        eventId,
-        startDateTime: startDateTimeObj,
-      });
-    }
+//     if (existing) {
+//       // ✅ Update existing schedule
+//       await existing.update({ startDateTime: startDateTimeObj });
+//     } else {
+//       // ✅ Create new schedule
+//       await EventAutomationSchedule.create({
+//         eventId,
+//         startDateTime: startDateTimeObj,
+//       });
+//     }
 
-    // ✅ Update event progress status
-    await Event.update(
-      { status: "step5_completed" },
-      { where: { id: eventId } }
-    );
+//     // ✅ Update event progress status
+//     await Event.update(
+//       { status: "step5_completed" },
+//       { where: { id: eventId } }
+//     );
 
-    res.status(200).json({ message: "Event schedule saved successfully" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-};
+//     res.status(200).json({ message: "Event schedule saved successfully" });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// };
 
 const getEventDetails = async (req, res) => {
   try {
@@ -918,7 +978,6 @@ module.exports = {
   addOrUpdateGuests,
   updateEventSettings,
   saveMessageTemplate,
-  saveEventSchedule,
   getEventDetails,
   getUserEvents,
   getEventAutomationStats,

@@ -38,7 +38,8 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/api/guest", guestRoutes);
 
-require("./cron/automationRunner");
+require("./workers/automationWorker");
+// require("./cron/automationRunner");
 
 // Database Sync
 sequelize

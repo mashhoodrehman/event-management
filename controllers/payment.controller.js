@@ -147,7 +147,8 @@ const processSetupFee = async (req, res) => {
       // }
 
       // // Create automation schedules
-      await createAutomations(event, settings, guests, templates);
+      await createAutomations(event, guests, templates);
+      // await createAutomations(event, settings, guests, templates);
     }
 
     // Do NOT mark event as completed here — only after success webhook

@@ -280,19 +280,19 @@ async function processAutomation(model, type) {
     const event = await Event.findByPk(eventId);
     if (!event) continue;
 
-    const settings = await EventSetting.findOne({ where: { eventId } });
-    if (!settings) {
-      console.warn(`No settings for event ${eventId}, skipping ${type}`);
-      continue;
-    }
+    // const settings = await EventSetting.findOne({ where: { eventId } });
+    // if (!settings) {
+    //   console.warn(`No settings for event ${eventId}, skipping ${type}`);
+    //   continue;
+    // }
 
     // 🔹 Respect "Start process automatically on the scheduled date"
-    if (!settings.automaticSending) {
-      console.log(
-        `automaticSending is OFF – skipping automatic ${type} for event ${eventId}`
-      );
-      continue;
-    }
+    // if (!settings.automaticSending) {
+    //   console.log(
+    //     `automaticSending is OFF – skipping automatic ${type} for event ${eventId}`
+    //   );
+    //   continue;
+    // }
 
     const guests = await Guest.findAll({ where: { eventId } });
     const guestByToken = new Map(guests.map((g) => [g.rsvpToken, g]));
@@ -302,14 +302,14 @@ async function processAutomation(model, type) {
     for (const task of dueTasks) {
       const guest = guestByToken.get(task.rsvpToken);
 
-      if (settings.automaticPause && guest && guest.status === "confirmed") {
-        console.log(
-          `Skipping ${type} for confirmed guest ${guest.name} (${guest.phone})`
-        );
-        task.status = "success"; // we treat this as completed
-        await task.save();
-        continue;
-      }
+      // if (settings.automaticPause && guest && guest.status === "confirmed") {
+      //   console.log(
+      //     `Skipping ${type} for confirmed guest ${guest.name} (${guest.phone})`
+      //   );
+      //   task.status = "success"; // we treat this as completed
+      //   await task.save();
+      //   continue;
+      // }
 
       deliverable.push({ task, guest });
     }
