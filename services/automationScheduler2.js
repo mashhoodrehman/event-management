@@ -7,61 +7,29 @@ const EventSetting = require("../models/eventSetting.model");
 const { generateSchedules } = require("./generateSchedules");
 const { enqueueAutomationJob } = require("../queues/automationQueue");
 
-async function createAutomations(event, guests, templates) {
+// 👇 Generic helper: create tasks & enqueue for a given list of steps
+async function createAutomationsForSteps(event, guests, templates, steps) {
   const eventId = event.id;
 
-  const allSteps = await EventSetting.findAll({
-    where: { eventId },
-    order: [
-      ["executionDate", "ASC"],
-      ["stepOrder", "ASC"],
-      ["id", "ASC"],
-    ],
-  });
-
-  if (!allSteps.length) {
+  if (!steps || !steps.length) return;
+  if (!Array.isArray(guests) || !guests.length) {
     console.warn(
-      `createAutomations: no EventSetting steps found for event ${eventId}`
+      `createAutomationsForSteps: no guests for event ${eventId}, skipping`
     );
     return;
   }
 
-  if (!Array.isArray(guests) || guests.length === 0) {
-    console.warn(
-      `createAutomations: no guests found for event ${eventId}, nothing to schedule`
-    );
-    return;
-  }
-
-  // 🔹 Only schedule for today & future (skip past)
-  const now = new Date();
-  const todayKey = now.toISOString().slice(0, 10);
-
-  const futureSteps = allSteps.filter((s) => {
-    const dateKey =
-      typeof s.executionDate === "string"
-        ? s.executionDate
-        : s.executionDate.toISOString().slice(0, 10);
-    return dateKey >= todayKey;
-  });
-
-  if (!futureSteps.length) {
-    console.log(
-      `createAutomations: no steps for today/future for event ${eventId}`
-    );
-    return;
-  }
-
+  // generateSchedules expects: { guests, steps, templates, eventId }
   const tasks = generateSchedules({
     guests,
-    steps: futureSteps,
+    steps,
     templates,
     eventId,
   });
 
   if (!tasks.length) {
     console.warn(
-      `createAutomations: generateSchedules returned 0 tasks for event ${eventId}`
+      `createAutomationsForSteps: generateSchedules returned 0 tasks for event ${eventId}`
     );
     return;
   }
@@ -77,10 +45,9 @@ async function createAutomations(event, guests, templates) {
       round: t.round,
     });
 
-    // queue job to fire at scheduledAt
     await enqueueAutomationJob({
-      type,
-      modelName,
+      type, // "SMS" | "WhatsApp" | ...
+      modelName, // "sms" | "whatsapp" | "ai" | "human"
       taskId: rec.id,
       scheduledAt: t.scheduledAt,
     });
@@ -105,8 +72,50 @@ async function createAutomations(event, guests, templates) {
   }
 
   console.log(
-    `createAutomations: created & queued ${tasks.length} tasks for event ${eventId}`
+    `createAutomationsForSteps: created & queued ${tasks.length} tasks for event ${eventId}`
   );
 }
 
-module.exports = { createAutomations };
+// 👇 Main function: ONLY future steps (date > today)
+async function createAutomations(event, guests, templates) {
+  const eventId = event.id;
+
+  const allSteps = await EventSetting.findAll({
+    where: { eventId },
+    order: [
+      ["executionDate", "ASC"],
+      ["stepOrder", "ASC"],
+      ["id", "ASC"],
+    ],
+  });
+
+  if (!allSteps.length) {
+    console.warn(
+      `createAutomations: no EventSetting rows found for event ${eventId}`
+    );
+    return;
+  }
+
+  const now = new Date();
+  const todayKey = now.toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  // 👉 only FUTURE steps (strictly after today)
+  const futureSteps = allSteps.filter((s) => {
+    const dateKey =
+      typeof s.executionDate === "string"
+        ? s.executionDate
+        : s.executionDate.toISOString().slice(0, 10);
+    return dateKey > todayKey;
+  });
+
+  if (!futureSteps.length) {
+    console.log(
+      `createAutomations: no future steps (date > today) for event ${eventId}`
+    );
+    return;
+  }
+
+  await createAutomationsForSteps(event, guests, templates, futureSteps);
+}
+
+module.exports = { createAutomations, createAutomationsForSteps };

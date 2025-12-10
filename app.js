@@ -9,6 +9,7 @@ const eventTypeRoutes = require("./routes/eventTypes.routes");
 const eventRoutes = require("./routes/event.routes");
 const stripeRoutes = require("./routes/stripe.routes");
 const guestRoutes = require("./routes/guest.routes");
+const automationRoutes = require("./routes/automation.routes");
 
 const path = require("path");
 
@@ -35,7 +36,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/event-types", eventTypeRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
-
+app.use("/api/automation", automationRoutes);
 app.use("/api/guest", guestRoutes);
 
 require("./workers/automationWorker");
