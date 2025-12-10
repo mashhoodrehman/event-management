@@ -9,6 +9,8 @@ const SMSAutomation = require("../models/smsAutomation.model");
 const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
+const ReminderAutomation = require("../models/reminderAutomation.model");
+const ReminderAutomationSchedule = require("../models/reminderAutomationSchedule.model");
 const Event = require("../models/event.model");
 const Guest = require("../models/guest.model");
 const User = require("../models/user.model");
@@ -39,6 +41,12 @@ function getPriceForType(type) {
       return AICALL_PRICE;
     case "HUMAN_CALL":
       return HUMANCALL_PRICE;
+
+    // reminders reuse same unit price:
+    case "REMINDER_SMS":
+      return SMS_PRICE;
+    case "REMINDER_WHATSAPP":
+      return WHATSAPP_PRICE;
     default:
       return 0;
   }
@@ -54,6 +62,11 @@ function mapAutomationTypeToPaymentType(type) {
       return "ai_call_fee";
     case "HUMAN_CALL":
       return "human_call_fee";
+    // reminder flows
+    case "REMINDER_SMS":
+      return "reminder_sms_fee";
+    case "REMINDER_WHATSAPP":
+      return "reminder_whatsapp_fee";
     default:
       return "sms_fee";
   }
@@ -120,14 +133,14 @@ async function sendAutomationChargeEmail({
       .replace(/{{paymentDate}}/g, paymentDate)
       .replace(/{{year}}/g, new Date().getFullYear());
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: user.email,
-      subject: `Automation charge for event "${
-        event?.name || ""
-      }" - ${currency}${totalILS} (date: ${dateKey})`,
-      html: emailTemplate,
-    });
+    // await transporter.sendMail({
+    //   from: process.env.EMAIL_USER,
+    //   to: user.email,
+    //   subject: `Automation charge for event "${
+    //     event?.name || ""
+    //   }" - ${currency}${totalILS} (date: ${dateKey})`,
+    //   html: emailTemplate,
+    // });
 
     console.log(
       `Charge email sent to ${user.email} for payment ${payment.paymentIntentId}`
@@ -272,8 +285,10 @@ function getModelByName(modelName) {
       return AICallAutomation;
     case "human":
       return HumanCallAutomation;
+    case "reminder":
+      return ReminderAutomation;
     default:
-      return SMSAutomation;
+      throw new Error(`Unknown modelName ${modelName}`);
   }
 }
 
@@ -446,6 +461,95 @@ const worker = new Worker(
         case "HUMAN_CALL":
           console.log(`Human call triggered for ${task.guestNumber}`);
           break;
+
+        case "REMINDER_SMS": {
+          const baseUrl =
+            process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
+          const rsvpLink = `${baseUrl}?token=${task.rsvpToken}`;
+
+          const eventName = event?.name || "";
+          const eventDateObj = event?.eventDate || null;
+          const location = event?.location || "";
+
+          let formattedDate = "";
+          if (eventDateObj) {
+            formattedDate = new Date(eventDateObj).toLocaleDateString("he-IL");
+          }
+
+          // 🔹 NEW: load schedule to get messageText
+          const schedule = await ReminderAutomationSchedule.findByPk(
+            task.scheduleId
+          );
+
+          const rawTemplate = (schedule && schedule.messageText) || "";
+
+          // 🔹 Basic placeholder replacement (supports EN + HE variants)
+          const message = rawTemplate
+            // name
+            .replace(/{{\s*first_name\s*}}/gi, guest?.name || "")
+            .replace(/\{name\}/gi, guest?.name || "")
+            .replace(/\{שם\}/g, guest?.name || "")
+            // event name
+            .replace(/\{eventName\}/gi, eventName)
+            // date
+            .replace(/\{date\}/gi, formattedDate)
+            .replace(/\{תאריך\}/g, formattedDate)
+            // location
+            .replace(/\{location\}/gi, location)
+            .replace(/\{מקום\}/g, location)
+            // link
+            .replace(/\{link\}/gi, rsvpLink);
+
+          await smsService.sendSMS(
+            task.guestNumber,
+            message,
+            task.rsvpToken,
+            task.senderName
+          );
+          break;
+        }
+
+        case "REMINDER_WHATSAPP": {
+          const baseUrl =
+            process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
+          const rsvpLink = `${baseUrl}?token=${task.rsvpToken}`;
+
+          const eventName = event?.name || "";
+          const eventDateObj = event?.eventDate || null;
+          const location = event?.location || "";
+
+          let formattedDate = "";
+          if (eventDateObj) {
+            formattedDate = new Date(eventDateObj).toLocaleDateString("he-IL");
+          }
+
+          // 🔹 NEW: load schedule to get messageText
+          console.log(task.scheduleId, "mmmmmmmmmmmmrrrrr");
+          const schedule = await ReminderAutomationSchedule.findByPk(
+            task.scheduleId
+          );
+          console.log(schedule, "mmmmmmmmmmmmrrrrr");
+
+          const rawTemplate = (schedule && schedule.messageText) || "";
+
+          const message = rawTemplate
+            .replace(/{{\s*first_name\s*}}/gi, guest?.name || "")
+            .replace(/\{name\}/gi, guest?.name || "")
+            .replace(/\{שם\}/g, guest?.name || "")
+            .replace(/\{eventName\}/gi, eventName)
+            .replace(/\{date\}/gi, formattedDate)
+            .replace(/\{תאריך\}/g, formattedDate)
+            .replace(/\{location\}/gi, location)
+            .replace(/\{מקום\}/g, location)
+            .replace(/\{link\}/gi, rsvpLink);
+
+          await whatsappService.sendWhatsAppTemplate(
+            task.guestNumber,
+            message,
+            task.rsvpToken
+          );
+          break;
+        }
       }
 
       task.status = "success";

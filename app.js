@@ -10,7 +10,7 @@ const eventRoutes = require("./routes/event.routes");
 const stripeRoutes = require("./routes/stripe.routes");
 const guestRoutes = require("./routes/guest.routes");
 const automationRoutes = require("./routes/automation.routes");
-
+const reminderRoutes = require("./routes/reminder.routes");
 const path = require("path");
 
 const app = express();
@@ -38,8 +38,10 @@ app.use("/api/event", eventRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/automation", automationRoutes);
 app.use("/api/guest", guestRoutes);
+app.use("/api/reminders", reminderRoutes);
 
 require("./workers/automationWorker");
+
 // require("./cron/automationRunner");
 
 // Database Sync

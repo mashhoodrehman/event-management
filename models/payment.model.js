@@ -16,7 +16,9 @@ const Payment = sequelize.define("Payment", {
       "sms_fee",
       "whatsapp_fee",
       "ai_call_fee",
-      "human_call_fee"
+      "human_call_fee",
+      "reminder_sms_fee",
+      "reminder_whatsapp_fee"
     ),
     allowNull: false,
     defaultValue: "setup_fee",
