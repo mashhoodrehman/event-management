@@ -6,6 +6,7 @@ const {
   getGuestsByFilters,
   getRecentActivity,
   getGuestStats,
+  getPendingFollowupGuests,
 } = require("../controllers/guest.controller");
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -19,5 +20,7 @@ router.get("/list", authMiddleware, getGuestsByFilters);
 router.get("/recent-activity", authMiddleware, getRecentActivity);
 
 router.get("/stats", authMiddleware, getGuestStats);
+
+router.get("/pending-followup", authMiddleware, getPendingFollowupGuests);
 
 module.exports = router;

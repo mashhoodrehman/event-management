@@ -12,7 +12,10 @@ const SMSAutomation = require("../models/smsAutomation.model");
 const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
-const { createAutomations } = require("../services/automationScheduler2");
+const {
+  createAutomations,
+  createAutomationsForSteps,
+} = require("../services/automationScheduler2");
 
 const xlsx = require("xlsx");
 
@@ -556,6 +559,118 @@ const updateEventSettings = async (req, res) => {
 //   }
 // };
 
+// const updateAutomationSettings = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+//     const { eventId, steps = [] } = req.body;
+
+//     if (!eventId) {
+//       return res.status(400).json({ error: "eventId is required" });
+//     }
+
+//     // ensure event belongs to this user
+//     const event = await Event.findOne({
+//       where: { id: eventId, userId },
+//     });
+//     if (!event) {
+//       return res.status(404).json({ error: "Event not found or unauthorized" });
+//     }
+
+//     const now = new Date();
+//     const todayKey = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
+
+//     // ✅ validate: user can only send future steps (runDate > today)
+//     const invalid = steps.filter(
+//       (s) => !s.runDate || s.runDate < todayKey || !s.baseType
+//     );
+//     if (invalid.length > 0) {
+//       return res.status(400).json({
+//         error:
+//           "You can edit or delete only future automations (after today). Past or in-progress automations cannot be modified.",
+//       });
+//     }
+
+//     // ✅ remove only FUTURE EventSetting rows for this event
+//     await EventSetting.destroy({
+//       where: {
+//         eventId,
+//         executionDate: { [Op.gt]: todayKey },
+//       },
+//     });
+
+//     // ✅ insert the new FUTURE steps
+//     const normalizeBaseType = (baseType) => {
+//       if (!baseType) return null;
+//       return baseType; // already "sms" | "whatsapp" | "ai_call" | "human_call"
+//     };
+
+//     const stepRows = steps.map((s) => ({
+//       eventId,
+//       baseType: normalizeBaseType(s.baseType),
+//       executionDate: s.runDate, // "YYYY-MM-DD"
+//       stepOrder: s.order ?? 1,
+//       rounds: s.rounds || 1,
+//       name: s.name || null,
+//     }));
+
+//     if (stepRows.length === 0) {
+//       // if user deleted all future steps, that's allowed → no more future automations
+//       // but we still need to clear future tasks
+//       console.log(`All future automations removed for event ${eventId}`);
+//     } else {
+//       await EventSetting.bulkCreate(stepRows);
+//     }
+
+//     // ✅ delete FUTURE pending automation tasks & let queue no-op on old jobs
+//     const todayStart = new Date(todayKey);
+//     todayStart.setHours(0, 0, 0, 0);
+
+//     const tomorrowStart = new Date(todayStart);
+//     tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+//     // We consider "future" tasks as those scheduled from tomorrow onward.
+//     const futureWhere = {
+//       eventId,
+//       status: "pending",
+//       scheduledAt: { [Op.gte]: tomorrowStart },
+//     };
+
+//     await Promise.all([
+//       SMSAutomation.destroy({ where: futureWhere }),
+//       WhatsAppAutomation.destroy({ where: futureWhere }),
+//       AICallAutomation.destroy({ where: futureWhere }),
+//       HumanCallAutomation.destroy({ where: futureWhere }),
+//     ]);
+
+//     // ✅ regenerate tasks only for FUTURE steps
+//     // (createAutomations will only schedule future ones; see next section)
+//     const guests = await Guest.findAll({ where: { eventId } });
+//     const template = await MessageTemplate.findOne({ where: { eventId } });
+
+//     const templates = {
+//       smsTemplateId: template?.id || null,
+//       whatsappTemplateId: template?.id || null,
+//       aiCallTemplateId: template?.id || null,
+//       humanCallTemplateId: template?.id || null,
+//     };
+
+//     await createAutomations(event, guests, templates);
+
+//     // optional: keep step3_completed
+//     await event.update({ status: "step3_completed" });
+
+//     return res.status(200).json({
+//       message: "Future automation steps updated successfully",
+//       stepsSaved: stepRows.length,
+//     });
+//   } catch (err) {
+//     console.error("updateAutomationSettings error:", err);
+//     return res
+//       .status(500)
+//       .json({ error: err.message || "Server error while saving steps" });
+//   }
+// };
+
 const updateAutomationSettings = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -576,18 +691,27 @@ const updateAutomationSettings = async (req, res) => {
     const now = new Date();
     const todayKey = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
 
-    // ✅ validate: user can only send future steps (runDate > today)
-    const invalid = steps.filter(
+    // ❌ reject past steps (runDate < today)
+    const invalidPast = steps.filter(
       (s) => !s.runDate || s.runDate < todayKey || !s.baseType
     );
-    if (invalid.length > 0) {
+    if (invalidPast.length > 0) {
       return res.status(400).json({
         error:
-          "You can edit or delete only future automations (after today). Past or in-progress automations cannot be modified.",
+          "You can only configure automations for today or future dates. Past automations cannot be modified.",
       });
     }
 
-    // ✅ remove only FUTURE EventSetting rows for this event
+    // split incoming steps into: todaySteps (new ones) & futureSteps (fully editable)
+    const todaySteps = steps.filter((s) => s.runDate === todayKey);
+    const futureSteps = steps.filter((s) => s.runDate > todayKey);
+
+    const normalizeBaseType = (baseType) => {
+      if (!baseType) return null;
+      return baseType; // "sms" | "whatsapp" | "ai_call" | "human_call"
+    };
+
+    // ✅ 1) HANDLE FUTURE STEPS: overwrite completely
     await EventSetting.destroy({
       where: {
         eventId,
@@ -595,41 +719,51 @@ const updateAutomationSettings = async (req, res) => {
       },
     });
 
-    // ✅ insert the new FUTURE steps
-    const normalizeBaseType = (baseType) => {
-      if (!baseType) return null;
-      return baseType; // already "sms" | "whatsapp" | "ai_call" | "human_call"
-    };
+    const futureRows =
+      futureSteps.length > 0
+        ? futureSteps.map((s) => ({
+            eventId,
+            baseType: normalizeBaseType(s.baseType),
+            executionDate: s.runDate,
+            stepOrder: s.order ?? 1,
+            rounds: s.rounds || 1,
+            name: s.name || null,
+          }))
+        : [];
 
-    const stepRows = steps.map((s) => ({
-      eventId,
-      baseType: normalizeBaseType(s.baseType),
-      executionDate: s.runDate, // "YYYY-MM-DD"
-      stepOrder: s.order ?? 1,
-      rounds: s.rounds || 1,
-      name: s.name || null,
-    }));
-
-    if (stepRows.length === 0) {
-      // if user deleted all future steps, that's allowed → no more future automations
-      // but we still need to clear future tasks
-      console.log(`All future automations removed for event ${eventId}`);
+    if (futureRows.length > 0) {
+      await EventSetting.bulkCreate(futureRows);
     } else {
-      await EventSetting.bulkCreate(stepRows);
+      console.log(`All future automations removed for event ${eventId}`);
     }
 
-    // ✅ delete FUTURE pending automation tasks & let queue no-op on old jobs
+    // ✅ 2) HANDLE TODAY STEPS: append only (no deletion of existing)
+    const todayRows =
+      todaySteps.length > 0
+        ? await Promise.all(
+            todaySteps.map((s) =>
+              EventSetting.create({
+                eventId,
+                baseType: normalizeBaseType(s.baseType),
+                executionDate: s.runDate, // todayKey
+                stepOrder: s.order ?? 1,
+                rounds: s.rounds || 1,
+                name: s.name || null,
+              })
+            )
+          )
+        : [];
+
+    // ✅ 3) delete FUTURE pending automation tasks, keep today's tasks as-is
     const todayStart = new Date(todayKey);
     todayStart.setHours(0, 0, 0, 0);
-
     const tomorrowStart = new Date(todayStart);
     tomorrowStart.setDate(tomorrowStart.getDate() + 1);
 
-    // We consider "future" tasks as those scheduled from tomorrow onward.
     const futureWhere = {
       eventId,
       status: "pending",
-      scheduledAt: { [Op.gte]: tomorrowStart },
+      scheduledAt: { [Op.gte]: tomorrowStart }, // >= tomorrow 00:00
     };
 
     await Promise.all([
@@ -639,8 +773,7 @@ const updateAutomationSettings = async (req, res) => {
       HumanCallAutomation.destroy({ where: futureWhere }),
     ]);
 
-    // ✅ regenerate tasks only for FUTURE steps
-    // (createAutomations will only schedule future ones; see next section)
+    // ✅ 4) regenerate tasks only for FUTURE steps (createAutomations now only uses > today)
     const guests = await Guest.findAll({ where: { eventId } });
     const template = await MessageTemplate.findOne({ where: { eventId } });
 
@@ -651,14 +784,19 @@ const updateAutomationSettings = async (req, res) => {
       humanCallTemplateId: template?.id || null,
     };
 
-    await createAutomations(event, guests, templates);
+    await createAutomations(event, guests, templates); // → only future
 
-    // optional: keep step3_completed
+    // ✅ 5) create tasks for TODAY's *new* steps only (no duplication)
+    if (todayRows.length > 0) {
+      // todayRows are the EventSetting instances we just created for today
+      await createAutomationsForSteps(event, guests, templates, todayRows);
+    }
+
     await event.update({ status: "step3_completed" });
 
     return res.status(200).json({
-      message: "Future automation steps updated successfully",
-      stepsSaved: stepRows.length,
+      message: "Automation steps updated successfully",
+      stepsSaved: futureRows.length + todayRows.length,
     });
   } catch (err) {
     console.error("updateAutomationSettings error:", err);
