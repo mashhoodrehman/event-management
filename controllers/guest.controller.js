@@ -2,6 +2,10 @@ const { Op } = require("sequelize");
 
 const Guest = require("../models/guest.model");
 const Event = require("../models/event.model");
+const SMSAutomation = require("../models/smsAutomation.model");
+const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
+const AICallAutomation = require("../models/aICallAutomation.model");
+const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const { formatTimeAgo } = require("../utils/timeAgo");
 
 /**
@@ -56,7 +60,6 @@ const getGuestDetails = async (req, res) => {
             "locationLat",
             "locationLng",
             "eventDate",
-            "endDate",
             "description",
           ],
         },
@@ -236,10 +239,167 @@ const getGuestStats = async (req, res) => {
   }
 };
 
+const getPendingFollowupGuests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { eventId } = req.query;
+
+    if (!eventId) {
+      return res.status(400).json({ error: "eventId is required" });
+    }
+
+    // Ensure event belongs to this user
+    const event = await Event.findOne({
+      where: { id: eventId, userId },
+    });
+
+    if (!event) {
+      return res.status(404).json({ error: "Event not found or unauthorized" });
+    }
+
+    // 1) Load guests: pending / hesitate / cancel
+    const guests = await Guest.findAll({
+      where: {
+        eventId,
+        status: {
+          [Op.in]: ["pending", "hesitate", "cancel"],
+        },
+      },
+      attributes: ["id", "name", "phone", "status", "rsvpToken"],
+      order: [["id", "ASC"]],
+    });
+
+    if (!guests.length) {
+      return res.json({ guests: [] });
+    }
+
+    const tokens = guests.map((g) => g.rsvpToken).filter((t) => !!t);
+
+    if (!tokens.length) {
+      return res.json({
+        guests: guests.map((g) => ({
+          id: g.id,
+          name: g.name,
+          phone: g.phone,
+          status: g.status,
+          attempts: [],
+        })),
+      });
+    }
+
+    // 2) Load all automation tasks by rsvpToken + eventId
+    const [smsTasks, whatsappTasks, aiTasks, humanTasks] = await Promise.all([
+      SMSAutomation.findAll({
+        where: {
+          eventId,
+          rsvpToken: { [Op.in]: tokens },
+        },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+      WhatsAppAutomation.findAll({
+        where: {
+          eventId,
+          rsvpToken: { [Op.in]: tokens },
+        },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+      AICallAutomation.findAll({
+        where: {
+          eventId,
+          rsvpToken: { [Op.in]: tokens },
+        },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+      HumanCallAutomation.findAll({
+        where: {
+          eventId,
+          rsvpToken: { [Op.in]: tokens },
+        },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+    ]);
+
+    // 3) Build maps
+    const guestByToken = new Map(
+      guests.filter((g) => !!g.rsvpToken).map((g) => [g.rsvpToken, g])
+    );
+
+    const attemptsByGuestId = new Map();
+    for (const g of guests) {
+      attemptsByGuestId.set(g.id, []);
+    }
+
+    const now = new Date();
+
+    const pushAttempt = (task, channel) => {
+      const guest = guestByToken.get(task.rsvpToken);
+      if (!guest) return;
+
+      const guestAttempts = attemptsByGuestId.get(guest.id);
+      if (!guestAttempts) return;
+
+      const scheduledAt =
+        task.scheduledAt instanceof Date
+          ? task.scheduledAt
+          : new Date(task.scheduledAt);
+
+      const isFuture = scheduledAt > now && task.status === "pending";
+
+      // guestResponded = guest.status != "pending"
+      const guestResponded = guest.status !== "pending";
+
+      guestAttempts.push({
+        id: task.id,
+        channel, // "sms" | "whatsapp" | "ai_call" | "human_call"
+        scheduledAt: scheduledAt.toISOString(),
+        executedAt: null, // if you later add executedAt field in models, fill here
+        status: task.status, // "pending" | "success" | "failed"
+        guestResponded,
+        guestResponseText: null, // if you later store reason/text, fill here
+      });
+    };
+
+    smsTasks.forEach((t) => pushAttempt(t, "sms"));
+    whatsappTasks.forEach((t) => pushAttempt(t, "whatsapp"));
+    aiTasks.forEach((t) => pushAttempt(t, "ai_call"));
+    humanTasks.forEach((t) => pushAttempt(t, "human_call"));
+
+    // 4) Build final response
+    const responseGuests = guests.map((g) => {
+      const attempts = attemptsByGuestId.get(g.id) || [];
+      // sort by scheduledAt just in case
+      attempts.sort(
+        (a, b) =>
+          new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+      );
+
+      return {
+        id: g.id,
+        name: g.name,
+        phone: g.phone,
+        status: g.status, // "pending" | "hesitate" | "cancel"
+        attempts,
+      };
+    });
+
+    return res.json({ guests: responseGuests });
+  } catch (err) {
+    console.error("getPendingFollowupGuests error:", err);
+    return res
+      .status(500)
+      .json({ error: err.message || "Server error while fetching guests" });
+  }
+};
+
 module.exports = {
   updateRSVPStatus,
   getGuestDetails,
   getGuestsByFilters,
   getRecentActivity,
   getGuestStats,
+  getPendingFollowupGuests,
 };
