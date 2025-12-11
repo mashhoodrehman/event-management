@@ -372,7 +372,12 @@ const worker = new Worker(
     }
 
     // 2) SKIP CONFIRMED GUESTS (same as old automaticPause behavior)
-    if (guest && guest.status === "confirmed") {
+    if (
+      guest &&
+      guest.status === "confirmed" &&
+      type !== "REMINDER_SMS" &&
+      type !== "REMINDER_WHATSAPP"
+    ) {
       console.log(
         `Skipping ${type} for confirmed guest ${guest.name} (${guest.phone})`
       );
