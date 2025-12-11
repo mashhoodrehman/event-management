@@ -11,6 +11,9 @@ const stripeRoutes = require("./routes/stripe.routes");
 const guestRoutes = require("./routes/guest.routes");
 const automationRoutes = require("./routes/automation.routes");
 const reminderRoutes = require("./routes/reminder.routes");
+const seedAdminUser = require("./seed/adminSeeder");
+const adminRoutes = require("./routes/admin.routes");
+
 const path = require("path");
 
 const app = express();
@@ -32,6 +35,7 @@ app.use("/api/stripe", stripeRoutes);
 app.use(bodyParser.json());
 
 // Routes
+app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/event-types", eventTypeRoutes);
 app.use("/api/event", eventRoutes);
@@ -51,6 +55,7 @@ sequelize
     console.log("✅ MySQL Database Connected & Synced");
 
     // Run seeder (only if needed)
+    await seedAdminUser();
     await seedEventTypes();
   })
   .catch((err) => console.error("❌ DB Connection Error:", err));
