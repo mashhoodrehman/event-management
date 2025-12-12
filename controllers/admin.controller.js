@@ -101,7 +101,6 @@ const getAllUsersWithSetupFee = async (req, res) => {
       for (const ev of events) {
         // hasOne -> single object: ev.Payment (NOT ev.Payments)
         const payment = ev.Payment;
-        console.log(payment, "payment bbbbbb");
 
         if (
           payment &&

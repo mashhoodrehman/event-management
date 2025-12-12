@@ -13,6 +13,8 @@ const automationRoutes = require("./routes/automation.routes");
 const reminderRoutes = require("./routes/reminder.routes");
 const seedAdminUser = require("./seed/adminSeeder");
 const adminRoutes = require("./routes/admin.routes");
+const seedServicePricing = require("./seed/servicePricingSeeder");
+const servicePricingRoutes = require("./routes/servicePricing.routes");
 
 const path = require("path");
 
@@ -43,6 +45,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/automation", automationRoutes);
 app.use("/api/guest", guestRoutes);
 app.use("/api/reminders", reminderRoutes);
+app.use("/api/admin/services", servicePricingRoutes);
 
 require("./workers/automationWorker");
 
@@ -57,6 +60,7 @@ sequelize
     // Run seeder (only if needed)
     await seedAdminUser();
     await seedEventTypes();
+    await seedServicePricing(); // ✅ ADD THIS
   })
   .catch((err) => console.error("❌ DB Connection Error:", err));
 
