@@ -7,11 +7,14 @@ const {
   getRecentActivity,
   getGuestStats,
   getPendingFollowupGuests,
+  addGuestManual,
 } = require("../controllers/guest.controller");
 const authMiddleware = require("../middleware/authMiddleware");
 
 // POST /api/guest/rsvp
 router.post("/rsvp", updateRSVPStatus);
+
+router.post("/add-manual", authMiddleware, addGuestManual);
 
 router.get("/details", getGuestDetails);
 
