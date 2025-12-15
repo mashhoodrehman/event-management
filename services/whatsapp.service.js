@@ -1,78 +1,78 @@
-// services/whatsapp.service.js
 require("dotenv").config();
 const axios = require("axios");
 const MessageTemplate = require("../models/messageTemplate.model");
 
-// 🔹 GREEN API CONFIG (HARDCODED AS REQUESTED)
+// 🔹 GREEN API CONFIG
 const GREEN_API_URL =
   "https://7105.api.greenapi.com/waInstance7105420574/sendMessage/115cbe965e8a4d0fb36c6e0949cc23cc7d561b0c52114fecaf";
 
-// 🔹 HARD CODED PAKISTAN NUMBER
+// 🔹 HARD CODED PAKISTAN NUMBER (testing)
 const HARD_CODED_CHAT_ID = "923324505905@c.us";
+
+/**
+ * Build PUBLIC RSVP link (never localhost)
+ */
+function buildRsvpLink(rsvpToken) {
+  const base =
+    (process.env.FRONTEND_BASE_URL || "").trim() ||
+    "https://yourdomain.com/rsvp"; // MUST be public
+
+  const baseUrl = base.replace(/\/+$/, "");
+  return `${baseUrl}?token=${encodeURIComponent(String(rsvpToken))}`;
+}
 
 module.exports = {
   /**
-   * Get message body from template & replace variables
+   * Get WhatsApp message from template
+   * (Template must NOT contain any RSVP link)
    */
   async getMessageByTemplate(templateId, variables = {}) {
     const template = await MessageTemplate.findByPk(templateId);
-
     if (!template) throw new Error("Template not found");
 
-    let message = template.messageBody || "";
+    let message = (template.messageBody || "").trim();
 
-    // Replace {key} with variables[key]
-    message = message.replace(/{(\w+)}/g, (match, key) => {
-      if (variables[key] === undefined || variables[key] === null) {
-        return match;
-      }
-      return String(variables[key]);
-    });
+    message = message.replace(/{(\w+)}/g, (_, key) => variables[key] ?? "");
 
-    return message;
+    return message.trim();
   },
 
   /**
-   * Send WhatsApp message via Green-API
+   * Send WhatsApp message
+   * FORMAT IS STRICTLY CONTROLLED HERE
    */
-  async sendWhatsAppTemplate(message, rsvpToken) {
+  async sendWhatsAppTemplate(guestNumber, message, rsvpToken) {
     try {
-      let finalMessage = message;
-
-      // 🔹 Append RSVP link if provided
-      if (rsvpToken) {
-        const baseUrl =
-          process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
-        const link = `${baseUrl}?token=${rsvpToken}`;
-
-        if (!finalMessage.includes(link)) {
-          finalMessage += `\n\nRSVP here: ${link}`;
-        }
+      if (!rsvpToken) {
+        throw new Error("RSVP token is required");
       }
+
+      const rsvpLink = buildRsvpLink(rsvpToken);
+
+      // 🔥 FINAL MESSAGE FORMAT (EXACTLY AS YOU ASKED)
+      const finalMessage = `${message}
+
+✅ RSVP Link:
+${rsvpLink}`;
 
       const requestBody = {
         chatId: HARD_CODED_CHAT_ID,
         message: finalMessage,
       };
 
-      console.log("📨 Sending WhatsApp via Green-API:", requestBody);
+      console.log("📨 Sending WhatsApp:", requestBody);
 
       const response = await axios.post(GREEN_API_URL, requestBody, {
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       });
 
-      return {
-        success: true,
-        data: response.data,
-      };
+      return { success: true, data: response.data };
     } catch (error) {
       console.error(
-        "❌ Green-API ERROR:",
+        "❌ WhatsApp Error:",
         error.response?.data || error.message
       );
-      throw new Error(error.response?.data?.message || error.message);
+      throw error;
     }
   },
 };

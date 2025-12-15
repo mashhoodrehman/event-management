@@ -425,14 +425,13 @@ async function processAutomation(model, type) {
               );
             }
 
-            const message = await smsService.getMessageByTemplate(
+            const message = await whatsappService.getMessageByTemplate(
               task.templateId,
               {
                 name: guest?.name || "",
                 eventName,
                 date: formattedDate,
                 location,
-                link: rsvpLink,
               }
             );
             await whatsappService.sendWhatsAppTemplate(
