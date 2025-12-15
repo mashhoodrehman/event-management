@@ -11,6 +11,12 @@ const Guest = sequelize.define("Guest", {
     defaultValue: "pending",
     allowNull: false,
   },
+  peopleCount: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 1,
+    validate: { min: 1, max: 50 }, // adjust max as you want
+  },
   rsvpToken: { type: DataTypes.STRING, unique: true }, // token for link
   //   eventId: { type: DataTypes.INTEGER, allowNull: false },
 });
