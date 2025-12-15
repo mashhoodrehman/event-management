@@ -15,6 +15,10 @@ const seedAdminUser = require("./seed/adminSeeder");
 const adminRoutes = require("./routes/admin.routes");
 const seedServicePricing = require("./seed/servicePricingSeeder");
 const servicePricingRoutes = require("./routes/servicePricing.routes");
+const agentHumanCallsRoutes = require("./routes/agentHumanCalls.routes");
+const agentAuthRoutes = require("./routes/agentAuth.routes");
+const seedAgent = require("./seed/agentSeeder");
+const aiCallWebhookRoutes = require("./routes/aiCallWebhook.routes");
 
 const path = require("path");
 
@@ -46,6 +50,9 @@ app.use("/api/automation", automationRoutes);
 app.use("/api/guest", guestRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/admin/services", servicePricingRoutes);
+app.use("/api/agent", agentHumanCallsRoutes);
+app.use("/api/agent-auth", agentAuthRoutes);
+app.use("/api/webhooks", aiCallWebhookRoutes);
 
 require("./workers/automationWorker");
 
@@ -53,11 +60,12 @@ require("./workers/automationWorker");
 
 // Database Sync
 sequelize
-  .sync()
+  .sync({ alter: true })
   .then(async ({}) => {
     console.log("✅ MySQL Database Connected & Synced");
 
     // Run seeder (only if needed)
+    await seedAgent();
     await seedAdminUser();
     await seedEventTypes();
     await seedServicePricing(); // ✅ ADD THIS

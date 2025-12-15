@@ -1,5 +1,5 @@
 const { Op } = require("sequelize");
-
+const crypto = require("crypto");
 const Guest = require("../models/guest.model");
 const Event = require("../models/event.model");
 const SMSAutomation = require("../models/smsAutomation.model");
@@ -13,6 +13,84 @@ const { formatTimeAgo } = require("../utils/timeAgo");
  * @param {string} token - unique RSVP token
  * @param {string} status - confirmed / hesitate / cancel
  */
+
+// 🔹 SAME normalization you already use
+const normalizePhone = (phone) => {
+  if (!phone) return null;
+
+  phone = String(phone)
+    .trim()
+    .replace(/[^\d+]/g, "");
+
+  // Pakistan
+  if (/^0?3\d{9}$/.test(phone)) {
+    if (phone.startsWith("0")) phone = phone.slice(1);
+    return "+92" + phone;
+  }
+  if (/^\+923\d{9}$/.test(phone)) return phone;
+
+  // Israel
+  if (/^0?5\d{8}$/.test(phone)) {
+    if (phone.startsWith("0")) phone = phone.slice(1);
+    return "+972" + phone;
+  }
+  if (/^\+9725\d{8}$/.test(phone)) return phone;
+
+  return null;
+};
+
+const addGuestManual = async (req, res) => {
+  try {
+    const { eventId, name, phone } = req.body;
+
+    if (!eventId)
+      return res
+        .status(400)
+        .json({ success: false, message: "eventId required" });
+
+    if (!name?.trim() || !phone?.trim())
+      return res
+        .status(400)
+        .json({ success: false, message: "Name and phone are required" });
+
+    const event = await Event.findByPk(eventId);
+    if (!event)
+      return res
+        .status(404)
+        .json({ success: false, message: "Event not found" });
+
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone)
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid phone number" });
+
+    // ❌ duplicate check (per event)
+    const exists = await Guest.findOne({
+      where: { eventId, phone: normalizedPhone },
+    });
+
+    if (exists)
+      return res.status(409).json({
+        success: false,
+        message: "Guest with this phone already exists",
+      });
+
+    const guest = await Guest.create({
+      eventId,
+      name: name.trim(),
+      phone: normalizedPhone,
+      status: "pending", // 🔒 backend controlled
+      accompanyingGuests: 0,
+      rsvpToken: crypto.randomBytes(16).toString("hex"),
+    });
+
+    res.status(201).json({ success: true, data: guest });
+  } catch (err) {
+    console.error("addGuestManual error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+};
 const updateRSVPStatus = async (req, res) => {
   try {
     const { token, status } = req.body;
@@ -402,4 +480,5 @@ module.exports = {
   getRecentActivity,
   getGuestStats,
   getPendingFollowupGuests,
+  addGuestManual,
 };
