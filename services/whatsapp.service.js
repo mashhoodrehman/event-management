@@ -7,7 +7,8 @@ const GREEN_API_URL =
   "https://7105.api.greenapi.com/waInstance7105420574/sendMessage/115cbe965e8a4d0fb36c6e0949cc23cc7d561b0c52114fecaf";
 
 // 🔹 HARD CODED PAKISTAN NUMBER (testing)
-const HARD_CODED_CHAT_ID = "923324505905@c.us";
+// const HARD_CODED_CHAT_ID = "923324505905@c.us";
+const HARD_CODED_CHAT_ID = "972543982101@c.us";
 
 /**
  * Build PUBLIC RSVP link (never localhost)

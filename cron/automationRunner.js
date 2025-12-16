@@ -404,6 +404,8 @@ async function processAutomation(model, type) {
               task.rsvpToken,
               task.senderName
             );
+            task.status = "success";
+            await task.save();
 
             console.log(`SMS sent to ${task.guestNumber}`);
             break;
@@ -439,6 +441,8 @@ async function processAutomation(model, type) {
               message,
               task.rsvpToken
             );
+            task.status = "success";
+            await task.save();
             console.log(`WhatsApp sent to ${task.guestNumber}`);
             break;
           }
@@ -452,8 +456,8 @@ async function processAutomation(model, type) {
             break;
         }
 
-        task.status = "success";
-        await task.save();
+        // task.status = "success";
+        // await task.save();
       } catch (err) {
         console.error(
           `Failed to execute ${type} for ${task.guestNumber}:`,

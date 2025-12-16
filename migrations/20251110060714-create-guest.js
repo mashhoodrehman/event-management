@@ -5,9 +5,9 @@ module.exports = {
     await queryInterface.createTable("Guests", {
       id: {
         type: Sequelize.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
         allowNull: false,
+        autoIncrement: true,
+        primaryKey: true,
       },
 
       name: {
@@ -26,8 +26,15 @@ module.exports = {
         defaultValue: "pending",
       },
 
+      peopleCount: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 1,
+      },
+
       rsvpToken: {
         type: Sequelize.STRING,
+        allowNull: true,
         unique: true,
       },
 
@@ -35,7 +42,7 @@ module.exports = {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Events", // your events table
+          model: "Events",
           key: "id",
         },
         onUpdate: "CASCADE",
@@ -45,18 +52,26 @@ module.exports = {
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
       },
 
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.fn("NOW"),
+        defaultValue: Sequelize.literal(
+          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        ),
       },
     });
+
+    // 🔥 Useful indexes
+    await queryInterface.addIndex("Guests", ["eventId"]);
+    await queryInterface.addIndex("Guests", ["status"]);
+    await queryInterface.addIndex("Guests", ["phone"]);
+    await queryInterface.addIndex("Guests", ["rsvpToken"]);
   },
 
-  async down(queryInterface, Sequelize) {
+  async down(queryInterface) {
     await queryInterface.dropTable("Guests");
   },
 };

@@ -1,13 +1,12 @@
+// routes/agentHumanCalls.routes.js
 const router = require("express").Router();
 const agentAuth = require("../middleware/agentAuth.middleware");
 const {
-  listHumanCallsForAgent,
-  claimHumanCall,
-  completeHumanCall,
+  getHumanCalls,
+  submitHumanCallResult,
 } = require("../controllers/agentHumanCalls.controller");
 
-router.get("/human-calls", agentAuth, listHumanCallsForAgent);
-router.post("/human-calls/:taskId/claim", agentAuth, claimHumanCall);
-router.post("/human-calls/:taskId/complete", agentAuth, completeHumanCall);
+router.get("/human-calls", agentAuth, getHumanCalls);
+router.post("/human-calls/:id/result", agentAuth, submitHumanCallResult);
 
 module.exports = router;

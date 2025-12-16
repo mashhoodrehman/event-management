@@ -46,6 +46,7 @@ app.use("/api/guest", guestRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/admin/services", servicePricingRoutes);
 app.use("/api/agent", agentHumanCallsRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use("/api/agent", agentAuthRoutes);
 

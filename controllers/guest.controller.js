@@ -93,10 +93,17 @@ const addGuestManual = async (req, res) => {
 };
 const updateRSVPStatus = async (req, res) => {
   try {
-    const { token, status } = req.body;
+    const { token, status, attendeesCount } = req.body;
+
+    console.log(token, status, attendeesCount, "mmmmmmm77777777");
 
     if (!token || !status) {
       return res.status(400).json({ message: "Token and status are required" });
+    }
+
+    const allowed = ["confirmed", "hesitate", "cancel"];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
     }
 
     // Find guest by token
@@ -105,14 +112,41 @@ const updateRSVPStatus = async (req, res) => {
       return res.status(404).json({ message: "Invalid RSVP token" });
     }
 
-    // Update status
+    // ✅ Update status
     guest.status = status;
+
+    // ✅ Update peopleCount ONLY when confirmed
+    if (status === "confirmed") {
+      const incoming = attendeesCount; // accept both
+      if (incoming !== undefined) {
+        const parsed = parseInt(incoming, 10);
+
+        if (Number.isNaN(parsed) || parsed < 1 || parsed > 50) {
+          return res.status(400).json({
+            message: "peopleCount must be a number between 1 and 50",
+          });
+        }
+        console.log(parsed, "===0099");
+        guest.peopleCount = parsed;
+      } else {
+        // if not sent, keep existing value or ensure default
+        guest.peopleCount = guest.peopleCount || 1;
+      }
+    } else {
+      // Optional: If not confirmed, you can reset to 1
+      guest.peopleCount = 1;
+    }
+
     await guest.save();
 
-    res.json({ success: true, status: guest.status });
+    return res.json({
+      success: true,
+      status: guest.status,
+      peopleCount: guest.peopleCount,
+    });
   } catch (err) {
     console.error("RSVP Update Error:", err);
-    res.status(500).json({ message: "Server error" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 

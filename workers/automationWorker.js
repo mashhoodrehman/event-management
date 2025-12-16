@@ -23,8 +23,8 @@ const transporter = require("../config/email");
 
 // ------ helpers shared with previous cron file ------
 
-const SMS_PRICE = parseInt(process.env.SMS_PRICE_AGOROT || "15", 10);
-const WHATSAPP_PRICE = parseInt(process.env.WHATSAPP_PRICE_AGOROT || "25", 10);
+const SMS_PRICE = parseInt(process.env.SMS_PRICE_AGOROT || "200", 10);
+const WHATSAPP_PRICE = parseInt(process.env.WHATSAPP_PRICE_AGOROT || "200", 10);
 const AICALL_PRICE = parseInt(process.env.AICALL_PRICE_AGOROT || "250", 10);
 const HUMANCALL_PRICE = parseInt(
   process.env.HUMANCALL_PRICE_AGOROT || "1500",
@@ -420,6 +420,8 @@ const worker = new Worker(
             task.rsvpToken,
             task.senderName
           );
+          task.status = "success";
+          await task.save();
 
           console.log(`SMS sent to ${task.guestNumber}`);
           break;
@@ -455,6 +457,8 @@ const worker = new Worker(
             message,
             task.rsvpToken
           );
+          task.status = "success";
+          await task.save();
           console.log(`WhatsApp sent to ${task.guestNumber}`);
           break;
         }
@@ -511,6 +515,8 @@ const worker = new Worker(
             task.rsvpToken,
             task.senderName
           );
+          task.status = "success";
+          await task.save();
           break;
         }
 
@@ -553,12 +559,14 @@ const worker = new Worker(
             message,
             task.rsvpToken
           );
+          task.status = "success";
+          await task.save();
           break;
         }
       }
 
-      task.status = "success";
-      await task.save();
+      // task.status = "success";
+      // await task.save();
     } catch (err) {
       console.error(`Failed to execute ${type} for ${task.guestNumber}:`, err);
       task.status = "failed";
