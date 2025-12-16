@@ -1,73 +1,41 @@
 const { DataTypes } = require("sequelize");
-const sequelize = require("../config/database"); // your sequelize instance
+const sequelize = require("../config/database");
 
 const HumanCallAutomation = sequelize.define("HumanCallAutomation", {
-  guestNumber: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 
-  rsvpToken: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
-
-  templateId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
+  guestNumber: { type: DataTypes.STRING, allowNull: false },
+  rsvpToken: { type: DataTypes.STRING, allowNull: false },
+  templateId: { type: DataTypes.INTEGER, allowNull: true },
 
   status: {
-    type: DataTypes.ENUM("pending", "failed", "success"),
-    defaultValue: "pending",
+    type: DataTypes.ENUM("queued_for_agent", "assigned", "success", "failed"),
+    defaultValue: "queued_for_agent",
   },
 
-  // 🔹 NEW: agent result
+  scheduledAt: { type: DataTypes.DATE, allowNull: false },
+  eventId: { type: DataTypes.INTEGER, allowNull: false },
+  round: { type: DataTypes.INTEGER, defaultValue: 1 },
+
+  billingPaymentId: { type: DataTypes.INTEGER, allowNull: true },
+
+  assignedAgentId: { type: DataTypes.INTEGER, allowNull: true },
+  assignedAt: { type: DataTypes.DATE, allowNull: true },
+
+  // ✅ what agent reports after call
   callResult: {
     type: DataTypes.ENUM("confirmed", "hesitate", "cancel", "no_answer"),
     allowNull: true,
   },
+  agentNotes: { type: DataTypes.TEXT, allowNull: true },
 
-  // 🔹 NEW: which agent handled this call
-  agentId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-  },
-
-  // 🔹 NEW: optional notes from agent
-  agentNote: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  },
-
-  scheduledAt: {
-    type: DataTypes.DATE,
-    allowNull: false,
-  },
-
-  // 🔹 NEW: helps completed tab & sorting
-  completedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-  },
-
-  eventId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-  },
-
-  round: {
-    type: DataTypes.INTEGER,
-    defaultValue: 1,
-  },
-
-  billingPaymentId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-  },
+  scheduleKey: { type: DataTypes.STRING, allowNull: false },
 });
 
 module.exports = HumanCallAutomation;
+
+// const { DataTypes } = require("sequelize");
+// const sequelize = require("../config/database"); // your sequelize instance
 
 // const HumanCallAutomation = sequelize.define("HumanCallAutomation", {
 //   guestNumber: {

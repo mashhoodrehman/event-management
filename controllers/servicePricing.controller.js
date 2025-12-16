@@ -67,24 +67,5 @@ const updateService = async (req, res) => {
     return res.status(500).json({ error: "Server error" });
   }
 };
-const getAllServicePricing = async (req, res) => {
-  try {
-    const prices = await ServicePricing.findAll({
-      attributes: ["id", "key", "name", "priceAgorot", "description"],
-      order: [["id", "ASC"]],
-    });
 
-    return res.json({
-      success: true,
-      data: prices,
-    });
-  } catch (error) {
-    console.error("Get Service Pricing Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch service pricing",
-    });
-  }
-};
-
-module.exports = { getAllServices, updateService, getAllServicePricing };
+module.exports = { getAllServices, updateService };

@@ -5,48 +5,38 @@ module.exports = {
     await queryInterface.createTable("MessageTemplates", {
       id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        autoIncrement: true,
         primaryKey: true,
+        autoIncrement: true,
+        allowNull: false,
       },
-
       eventId: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        unique: true, // ✅ because Event.hasOne(MessageTemplate)
         references: {
-          model: "Events",
+          model: "Events", // Must match your Event table name
           key: "id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
-
       messageBody: {
         type: Sequelize.TEXT,
         allowNull: false,
       },
-
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.fn("NOW"),
       },
-
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal(
-          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-        ),
+        defaultValue: Sequelize.fn("NOW"),
       },
     });
-
-    // optional index (unique already helps)
-    await queryInterface.addIndex("MessageTemplates", ["eventId"]);
   },
 
-  async down(queryInterface) {
+  async down(queryInterface, Sequelize) {
     await queryInterface.dropTable("MessageTemplates");
   },
 };

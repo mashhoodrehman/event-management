@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="he">
+  <head>
+    <meta charset="UTF-8" />
+    <title>קבלה על חיוב אוטומציה</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
+        padding: 0;
+        direction: rtl;
+        text-align: right;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+        background: #ffffff;
+        padding: 24px;
+        border-radius: 8px;
+      }
+      h1 {
+        font-size: 20px;
+        margin-bottom: 16px;
+      }
+      p {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 16px;
+        margin-bottom: 16px;
+      }
+      .summary-table th,
+      .summary-table td {
+        border: 1px solid #dddddd;
+        padding: 8px;
+        text-align: right;
+        font-size: 14px;
+      }
+      .footer {
+        font-size: 12px;
+        color: #777777;
+        margin-top: 16px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>קבלה על חיוב אוטומציה</h1>
+
+      <p>שלום {{name}},</p>
+
+      <p>
+        בוצע חיוב חדש עבור האירוע שלך
+        <strong>"{{eventName}}"</strong>.
+      </p>
+
+      <table class="summary-table">
+        <tr>
+          <th>סוג האוטומציה</th>
+          <td>{{automationType}}</td>
+        </tr>
+        <tr>
+          <th>מספר יחידות שנשלחו</th>
+          <td>{{quantity}}</td>
+        </tr>
+        <tr>
+          <th>מחיר ליחידה</th>
+          <td>{{currency}} {{unitPrice}}</td>
+        </tr>
+        <tr>
+          <th>סכום כולל</th>
+          <td><strong>{{currency}} {{total}}</strong></td>
+        </tr>
+        <tr>
+          <th>מספר עסקה</th>
+          <td>{{paymentId}}</td>
+        </tr>
+        <tr>
+          <th>תאריך חיוב</th>
+          <td>{{paymentDate}}</td>
+        </tr>
+      </table>
+
+      <p>
+        אם יש לך שאלות לגבי חיוב זה או שאתה סבור שקיימת טעות — אנא צור איתנו
+        קשר.
+      </p>
+
+      <p class="footer">
+        &copy; {{year}} מערכת ניהול אירועים. כל הזכויות שמורות.
+      </p>
+    </div>
+  </body>
+</html>

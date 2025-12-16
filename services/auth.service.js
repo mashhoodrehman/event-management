@@ -4,6 +4,13 @@ const crypto = require("crypto");
 const User = require("../models/user.model");
 const transporter = require("../config/email");
 require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
+
+function loadTemplate(fileName) {
+  const filePath = path.join(__dirname, "..", "templates", fileName);
+  return fs.readFileSync(filePath, "utf8");
+}
 
 // 🧠 Signup with email verification
 const signup = async ({ name, email, password, type }) => {
@@ -26,18 +33,26 @@ const signup = async ({ name, email, password, type }) => {
   });
 
   const verificationLink = `http://localhost:5000/api/auth/verify?token=${verificationToken}`;
+  let emailTemplate = loadTemplate("verificationEmail.html");
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: email,
-    subject: "Verify your account",
-    html: `
-      <h2>Welcome, ${name}!</h2>
-      <p>Your account type: <b>${type}</b></p>
-      <p>Click the link below to verify your account:</p>
-      <a href="${verificationLink}" target="_blank">${verificationLink}</a>
-    `,
-  });
+  emailTemplate = emailTemplate
+    .replace(/{{name}}/g, name)
+    .replace(/{{type}}/g, type)
+    .replace(/{{verificationLink}}/g, verificationLink)
+    .replace(/{{year}}/g, new Date().getFullYear());
+
+  // await transporter.sendMail({
+  //   from: process.env.EMAIL_USER,
+  //   to: email,
+  //   subject: "Verify your account",
+  //   html: emailTemplate,
+  //   // html: `
+  //   //   <h2>Welcome, ${name}!</h2>
+  //   //   <p>Your account type: <b>${type}</b></p>
+  //   //   <p>Click the link below to verify your account:</p>
+  //   //   <a href="${verificationLink}" target="_blank">${verificationLink}</a>
+  //   // `,
+  // });
 
   return {
     message: "User registered. Please check your email for verification link.",
@@ -49,8 +64,8 @@ const login = async ({ email, password }) => {
   const user = await User.findOne({ where: { email } });
   if (!user) throw new Error("User not found");
 
-  if (!user.isVerified)
-    throw new Error("Account not verified. Please check your email.");
+  // if (!user.isVerified)
+  //   throw new Error("Account not verified. Please check your email.");
 
   const validPassword = await bcrypt.compare(password, user.password);
   if (!validPassword) throw new Error("Invalid password");
@@ -58,7 +73,7 @@ const login = async ({ email, password }) => {
   const token = jwt.sign(
     { id: user.id, email: user.email, type: user.type },
     process.env.JWT_SECRET,
-    { expiresIn: "1h" }
+    { expiresIn: "30d" }
   );
 
   return {
@@ -68,16 +83,34 @@ const login = async ({ email, password }) => {
 };
 
 // ✅ Verify account
-const verifyAccount = async (token) => {
+// const verifyAccount = async (token) => {
+//   const user = await User.findOne({ where: { verificationToken: token } });
+
+//   if (!user) throw new Error("Invalid or expired verification token");
+
+//   user.isVerified = true;
+//   user.verificationToken = null;
+//   await user.save();
+
+//   return { message: "Account verified successfully!" };
+// };
+const verifyAccount = async (token, res) => {
   const user = await User.findOne({ where: { verificationToken: token } });
 
-  if (!user) throw new Error("Invalid or expired verification token");
+  if (!user) {
+    if (!user) throw new Error("Invalid or expired verification link");
+  }
 
   user.isVerified = true;
   user.verificationToken = null;
   await user.save();
 
-  return { message: "Account verified successfully!" };
+  let successHtml = loadTemplate("verificationSuccess.html");
+  successHtml = successHtml.replace(
+    /{{loginUrl}}/g,
+    process.env.FRONTEND_LOGIN_URL
+  );
+  return successHtml;
 };
 
 // 👤 Get Profile

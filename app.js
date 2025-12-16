@@ -4,8 +4,6 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const sequelize = require("./config/database");
 const authRoutes = require("./routes/auth.routes");
-<<<<<<< Updated upstream
-=======
 const seedEventTypes = require("./seed/eventTypeSeeder");
 const eventTypeRoutes = require("./routes/eventTypes.routes");
 const eventRoutes = require("./routes/event.routes");
@@ -24,7 +22,6 @@ const aiCallWebhookRoutes = require("./routes/aiCallWebhook.routes");
 const eventHumanCallsRoutes = require("./routes/eventHumanCalls.routes");
 
 const path = require("path");
->>>>>>> Stashed changes
 
 const app = express();
 
@@ -41,8 +38,6 @@ app.use(bodyParser.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
-<<<<<<< Updated upstream
-=======
 app.use("/api/event-types", eventTypeRoutes);
 app.use("/api/event", eventRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -60,14 +55,10 @@ app.use("/api/event", eventHumanCallsRoutes);
 require("./workers/automationWorker");
 
 // require("./cron/automationRunner");
->>>>>>> Stashed changes
 
 // Database Sync
 sequelize
   .sync()
-<<<<<<< Updated upstream
-  .then(() => console.log("✅ MySQL Database Connected"))
-=======
   .then(async ({}) => {
     console.log("✅ MySQL Database Connected & Synced");
 
@@ -77,7 +68,6 @@ sequelize
     await seedEventTypes();
     await seedServicePricing(); // ✅ ADD THIS
   })
->>>>>>> Stashed changes
   .catch((err) => console.error("❌ DB Connection Error:", err));
 
 // Start server

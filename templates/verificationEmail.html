@@ -1,0 +1,81 @@
+<html>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background: #f4f4f7;
+      font-family: 'Arial', sans-serif;
+      direction: rtl;
+      text-align: right;
+    "
+  >
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 0">
+      <tr>
+        <td align="center">
+          <table
+            width="480"
+            style="
+              background: #ffffff;
+              border-radius: 12px;
+              box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+              padding: 35px;
+            "
+          >
+            <tr>
+              <td align="center">
+                <h2
+                  style="color: #2c2c2c; margin-bottom: 10px; font-size: 26px"
+                >
+                  ברוך הבא, {{name}} 👋
+                </h2>
+
+                <p style="color: #555; font-size: 15px; margin: 0">
+                  תודה שנרשמת! יצרת חשבון מסוג <b>{{type}}</b>.
+                </p>
+
+                <p style="color: #666; font-size: 14px; margin: 20px 0 25px">
+                  לחץ על הכפתור למטה כדי לאמת את כתובת האימייל שלך ולהפעיל את
+                  החשבון.
+                </p>
+
+                <a
+                  href="{{verificationLink}}"
+                  style="
+                    display: inline-block;
+                    background: #4f46e5;
+                    padding: 14px 26px;
+                    color: white;
+                    font-size: 16px;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    box-shadow: 0 3px 10px rgba(79, 70, 229, 0.3);
+                  "
+                >
+                  אימות חשבון
+                </a>
+
+                <p style="color: #777; font-size: 12px; margin-top: 30px">
+                  אם הכפתור לא עובד, העתק והדבק את הקישור הבא בדפדפן שלך:
+                </p>
+
+                <p
+                  style="color: #0066cc; font-size: 12px; word-break: break-all"
+                >
+                  {{verificationLink}}
+                </p>
+
+                <hr
+                  style="margin: 40px 0; border: 0; border-top: 1px solid #eee"
+                />
+
+                <p style="color: #aaa; font-size: 12px">
+                  © {{year}} מערכת ניהול אירועים — כל הזכויות שמורות.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

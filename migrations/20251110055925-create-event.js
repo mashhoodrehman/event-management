@@ -5,61 +5,42 @@ module.exports = {
     await queryInterface.createTable("Events", {
       id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        autoIncrement: true,
         primaryKey: true,
+        autoIncrement: true,
+        allowNull: false,
       },
-
       name: {
         type: Sequelize.STRING,
         allowNull: false,
       },
-
       typeId: {
         type: Sequelize.INTEGER,
         allowNull: false,
       },
-
       eventDate: {
         type: Sequelize.DATE,
         allowNull: false,
       },
-
+      endDate: {
+        type: Sequelize.DATE,
+        allowNull: false,
+      },
       location: {
         type: Sequelize.STRING,
         allowNull: false,
       },
-
-      locationName: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
-
-      locationLat: {
-        type: Sequelize.DECIMAL(10, 7),
-        allowNull: true,
-      },
-
-      locationLng: {
-        type: Sequelize.DECIMAL(10, 7),
-        allowNull: true,
-      },
-
       estimatedGuests: {
         type: Sequelize.INTEGER,
         allowNull: false,
       },
-
       description: {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-
       invitationFile: {
         type: Sequelize.STRING,
         allowNull: true,
       },
-
       status: {
         type: Sequelize.ENUM(
           "draft",
@@ -67,51 +48,35 @@ module.exports = {
           "step2_completed",
           "step3_completed",
           "step4_completed",
+          "step5_completed",
           "completed"
         ),
-        allowNull: false,
         defaultValue: "draft",
       },
-
-      // 🔗 Relation to User
       userId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Users",
+          model: "Users", // Must match the table name of your User model
           key: "id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
-
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.fn("NOW"),
       },
-
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal(
-          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-        ),
+        defaultValue: Sequelize.fn("NOW"),
       },
     });
-
-    // 🔥 Helpful indexes for performance
-    await queryInterface.addIndex("Events", ["userId"]);
-    await queryInterface.addIndex("Events", ["status"]);
-    await queryInterface.addIndex("Events", ["eventDate"]);
   },
 
   async down(queryInterface, Sequelize) {
     await queryInterface.dropTable("Events");
-
-    // ENUM cleanup (safe for MySQL, needed for Postgres)
-    await queryInterface.sequelize
-      .query('DROP TYPE IF EXISTS "enum_Events_status";')
-      .catch(() => {});
   },
 };

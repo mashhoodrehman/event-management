@@ -12,14 +12,20 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
+    "bullmq": "^5.65.1",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.2",
     "mysql2": "^3.15.3",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.10",
     "nodemon": "^3.1.10",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "stripe": "^19.3.0",
+    "xlsx": "^0.18.5"
   }
 }

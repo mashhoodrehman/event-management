@@ -1,262 +1,213 @@
-// controllers/agentHumanCalls.controller.js
 const { Op } = require("sequelize");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const Guest = require("../models/guest.model");
 const Event = require("../models/event.model");
-const Stripe = require("stripe");
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
-const Payment = require("../models/payment.model");
-const User = require("../models/user.model");
-
-const SMSAutomation = require("../models/smsAutomation.model");
-const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
-const AICallAutomation = require("../models/aICallAutomation.model");
-
-exports.getHumanCalls = async (req, res) => {
+/**
+ * GET /api/agent/human-calls?tab=pending|completed
+ */
+const listHumanCallsForAgent = async (req, res) => {
   try {
-    const status = (req.query.status || "pending").toLowerCase(); // pending | completed
-    const now = new Date();
+    const agentId = req.agent.id;
+    const tab = String(req.query.tab || "pending");
 
-    const where = {
-      billingPaymentId: { [Op.not]: null }, // ✅ only paid / ready
-    };
+    const baseWhere = { billingPaymentId: { [Op.not]: null } };
 
-    if (status === "pending") {
-      where.status = "pending";
-      where.scheduledAt = { [Op.lte]: now }; // ✅ due now
+    let where = { ...baseWhere };
+
+    if (tab === "pending") {
+      where = {
+        ...baseWhere,
+        [Op.or]: [
+          { status: "queued_for_agent" },
+          { status: "assigned", assignedAgentId: agentId },
+        ],
+      };
+    } else if (tab === "completed") {
+      where = {
+        ...baseWhere,
+        status: { [Op.in]: ["success", "failed"] },
+        assignedAgentId: agentId,
+      };
     } else {
-      // completed / anything else => success + failed
-      where.status = { [Op.in]: ["success", "failed"] };
+      return res
+        .status(400)
+        .json({ error: "tab must be pending or completed" });
     }
 
-    const calls = await HumanCallAutomation.findAll({
+    const tasks = await HumanCallAutomation.findAll({
       where,
       order: [["scheduledAt", "ASC"]],
+      limit: 200,
     });
 
-    if (!calls.length) {
-      return res.status(200).json({ calls: [] });
-    }
-
-    // attach guest + event info
-    const tokens = calls.map((c) => c.rsvpToken).filter(Boolean);
-
-    const guestWhere = {
-      rsvpToken: { [Op.in]: tokens },
-    };
-
-    // ✅ exclude confirmed guests from pending list
-    if (status === "pending") {
-      guestWhere.status = { [Op.ne]: "confirmed" };
-    }
+    const tokens = tasks.map((t) => t.rsvpToken);
+    const eventIds = [...new Set(tasks.map((t) => t.eventId))];
 
     const guests = await Guest.findAll({
-      where: guestWhere,
-      include: [
-        { model: Event, attributes: ["id", "name", "eventDate", "location"] },
-      ],
+      where: { rsvpToken: { [Op.in]: tokens } },
     });
-
     const guestByToken = new Map(guests.map((g) => [g.rsvpToken, g]));
 
-    const result = calls
-      .map((c) => {
-        const g = guestByToken.get(c.rsvpToken);
+    const events = await Event.findAll({
+      where: { id: { [Op.in]: eventIds } },
+    });
+    const eventById = new Map(events.map((e) => [e.id, e]));
 
-        // ✅ if pending + guest is confirmed OR guest not found (filtered out), hide it
-        if (status === "pending" && (!g || g.status === "confirmed")) {
-          return null;
-        }
+    const items = tasks.map((t) => {
+      const guest = guestByToken.get(t.rsvpToken);
+      const event = eventById.get(t.eventId);
 
-        return {
-          id: c.id,
-          eventId: c.eventId,
-          scheduledAt: c.scheduledAt,
-          automationStatus: c.status,
-          billingPaymentId: c.billingPaymentId,
-          templateId: c.templateId ?? null,
-          round: c.round ?? null,
+      return {
+        id: t.id,
+        status: t.status,
+        scheduledAt: t.scheduledAt,
+        round: t.round,
 
-          guest: g
-            ? {
-                id: g.id,
-                name: g.name,
-                phone: g.phone,
-                status: g.status,
-                peopleCount: g.peopleCount,
-                rsvpToken: g.rsvpToken,
-              }
-            : null,
+        billingPaymentId: t.billingPaymentId,
 
-          event: g?.Event
-            ? {
-                id: g.Event.id,
-                name: g.Event.name,
-                eventDate: g.Event.eventDate,
-                location: g.Event.location,
-              }
-            : null,
-        };
-      })
-      .filter(Boolean);
+        assignedAgentId: t.assignedAgentId,
+        assignedAt: t.assignedAt,
 
-    return res.status(200).json({ calls: result });
-  } catch (e) {
-    console.error("getHumanCalls:", e);
+        callResult: t.callResult,
+        agentNotes: t.agentNotes,
+
+        guest: {
+          name: guest?.name || null,
+          phone: guest?.phone || t.guestNumber,
+          rsvpToken: t.rsvpToken,
+          currentStatus: guest?.status || null,
+          peopleCount: guest?.peopleCount ?? 1, // ✅ NEW
+        },
+
+        event: {
+          id: event?.id || t.eventId,
+          name: event?.name || null,
+          eventDate: event?.eventDate || null,
+          time: event?.time || null,
+          location: event?.location || null,
+        },
+      };
+    });
+
+    return res.json({ tab, count: items.length, items });
+  } catch (err) {
+    console.error("listHumanCallsForAgent error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 };
 
-function mapResultToGuestStatus(result) {
-  switch (result) {
-    case "confirmed":
-      return "confirmed";
-    case "hesitate":
-      return "hesitate";
-    case "cancel":
-      return "cancel";
-    case "no_answer":
-      return null; // guest stays pending
-    default:
-      return null;
-  }
-}
-
-async function chargeHumanCallFee({ event, user, humanCallTaskId }) {
-  // ✅ you can load from ServicePricing table if you have it.
-  // For now use env (agorot). Example: 1500 = ₪15
-  const HUMAN_CALL_PRICE = parseInt(
-    process.env.HUMANCALL_PRICE_AGOROT || "1500",
-    10
-  );
-
-  if (!user?.stripeCustomerId) throw new Error("User missing stripeCustomerId");
-
-  // pick default card
-  const pms = await stripe.paymentMethods.list({
-    customer: user.stripeCustomerId,
-    type: "card",
-    limit: 1,
-  });
-  if (!pms.data?.length) throw new Error("No saved card");
-
-  const pi = await stripe.paymentIntents.create({
-    amount: HUMAN_CALL_PRICE,
-    currency: "ils",
-    customer: user.stripeCustomerId,
-    payment_method: pms.data[0].id,
-    off_session: true,
-    confirm: true,
-    description: `Human call fee for event #${event.id}`,
-    metadata: {
-      eventId: String(event.id),
-      paymentType: "human_call_fee",
-      taskId: String(humanCallTaskId),
-    },
-  });
-
-  const statusMap = {
-    succeeded: "succeeded",
-    requires_action: "requires_action",
-    processing: "initiated",
-    requires_payment_method: "failed",
-  };
-  const paymentStatus = statusMap[pi.status] || "initiated";
-
-  const payment = await Payment.create({
-    eventId: event.id,
-    amount: HUMAN_CALL_PRICE,
-    currency: "ils",
-    paymentIntentId: pi.id,
-    type: "human_call_fee",
-    status: paymentStatus,
-  });
-
-  if (pi.status !== "succeeded") {
-    throw new Error(`Payment not succeeded: ${pi.status}`);
-  }
-
-  return payment;
-}
-
-exports.submitHumanCallResult = async (req, res) => {
+/**
+ * POST /api/agent/human-calls/:taskId/claim
+ */
+const claimHumanCall = async (req, res) => {
   try {
-    const { id } = req.params; // HumanCallAutomation id
-    const { result, peopleCount = 1, note } = req.body;
+    const agentId = req.agent.id;
+    const { taskId } = req.params;
 
-    if (!["confirmed", "hesitate", "cancel", "no_answer"].includes(result)) {
-      return res.status(400).json({ error: "Invalid result" });
-    }
-
-    const task = await HumanCallAutomation.findByPk(id);
+    const task = await HumanCallAutomation.findByPk(taskId);
     if (!task) return res.status(404).json({ error: "Task not found" });
 
-    // must be pending to submit
-    if (task.status !== "pending") {
-      return res.status(400).json({ error: "Task already completed" });
+    if (!task.billingPaymentId) {
+      return res.status(400).json({ error: "Task not billed yet" });
     }
 
-    // guest
-    const guest = await Guest.findOne({ where: { rsvpToken: task.rsvpToken } });
-    if (!guest) return res.status(404).json({ error: "Guest not found" });
+    if (task.status !== "queued_for_agent") {
+      return res
+        .status(400)
+        .json({ error: "Task already claimed or finished" });
+    }
 
-    // event & user
-    const event = await Event.findByPk(task.eventId);
-    if (!event) return res.status(404).json({ error: "Event not found" });
+    await task.update({
+      status: "assigned",
+      assignedAgentId: agentId,
+      assignedAt: new Date(),
+    });
 
-    const user = await User.findByPk(event.userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
+    return res.json({ message: "Claimed", taskId: task.id });
+  } catch (err) {
+    console.error("claimHumanCall error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+};
 
-    // ✅ If result updates guest status
-    const newGuestStatus = mapResultToGuestStatus(result);
-    if (newGuestStatus) {
-      await guest.update({
-        status: newGuestStatus,
-        peopleCount: Math.max(1, parseInt(peopleCount, 10) || 1),
+/**
+ * POST /api/agent/human-calls/:taskId/complete
+ * Body: { result, notes?, peopleCount? }
+ */
+const completeHumanCall = async (req, res) => {
+  try {
+    const agentId = req.agent.id;
+    const { taskId } = req.params;
+    const { result, notes, peopleCount } = req.body;
+
+    const allowed = ["confirmed", "hesitate", "cancel", "no_answer"];
+    if (!allowed.includes(result)) {
+      return res.status(400).json({
+        error: "result must be confirmed|hesitate|cancel|no_answer",
       });
     }
 
-    // ✅ Mark task success (agent did work)
-    // (You can store agentId / note by adding columns if you want)
-    await task.update({ status: "success" });
-
-    // ✅ Charge human call fee NOW (per call)
-    const payment = await chargeHumanCallFee({
-      event,
-      user,
-      humanCallTaskId: task.id,
-    });
-
-    await task.update({ billingPaymentId: payment.id });
-
-    // ✅ Cleanup future automations if confirmed/cancel (optional but recommended)
-    if (newGuestStatus === "confirmed" || newGuestStatus === "cancel") {
-      const futureWhere = {
-        eventId: event.id,
-        rsvpToken: guest.rsvpToken,
-        status: "pending",
-        scheduledAt: { [Op.gt]: new Date() },
-      };
-
-      await Promise.all([
-        SMSAutomation.destroy({ where: futureWhere }),
-        WhatsAppAutomation.destroy({ where: futureWhere }),
-        AICallAutomation.destroy({ where: futureWhere }),
-      ]);
+    if (peopleCount != null) {
+      const n = Number(peopleCount);
+      if (!Number.isInteger(n) || n < 1 || n > 50) {
+        return res
+          .status(400)
+          .json({ error: "peopleCount must be integer 1..50" });
+      }
     }
 
-    return res.status(200).json({
-      message: "Call result saved",
-      guest: {
-        id: guest.id,
-        status: guest.status,
-        peopleCount: guest.peopleCount,
-      },
-      paymentId: payment.id,
+    const task = await HumanCallAutomation.findByPk(taskId);
+    if (!task) return res.status(404).json({ error: "Task not found" });
+
+    if (!task.billingPaymentId) {
+      return res.status(400).json({ error: "Task not billed yet" });
+    }
+
+    if (task.assignedAgentId !== agentId) {
+      return res.status(403).json({ error: "Not your task" });
+    }
+
+    if (task.status !== "assigned") {
+      return res.status(400).json({ error: "Task is not in assigned state" });
+    }
+
+    const taskStatus = result === "no_answer" ? "failed" : "success";
+
+    await task.update({
+      status: taskStatus,
+      callResult: result,
+      agentNotes: notes || null,
     });
-  } catch (e) {
-    console.error("submitHumanCallResult:", e);
-    return res.status(500).json({ error: e.message || "Server error" });
+
+    // ✅ Update guest status + peopleCount (only on confirmed)
+    if (
+      result === "confirmed" ||
+      result === "hesitate" ||
+      result === "cancel"
+    ) {
+      const update = { status: result };
+
+      if (result === "confirmed" && peopleCount != null) {
+        update.peopleCount = Number(peopleCount);
+      }
+
+      await Guest.update(update, { where: { rsvpToken: task.rsvpToken } });
+    }
+
+    return res.json({
+      message: "Completed",
+      taskId: task.id,
+      status: taskStatus,
+    });
+  } catch (err) {
+    console.error("completeHumanCall error:", err);
+    return res.status(500).json({ error: "Server error" });
   }
+};
+
+module.exports = {
+  listHumanCallsForAgent,
+  claimHumanCall,
+  completeHumanCall,
 };

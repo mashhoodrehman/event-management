@@ -5,51 +5,38 @@ module.exports = {
     await queryInterface.createTable("EventAutomationSchedules", {
       id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        autoIncrement: true,
         primaryKey: true,
+        autoIncrement: true,
+        allowNull: false,
       },
-
       eventId: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        unique: true, // ✅ because Event hasOne EventAutomationSchedule
         references: {
-          model: "Events",
+          model: "Events", // Must match your Event table name
           key: "id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
-
       startDateTime: {
         type: Sequelize.DATE,
         allowNull: false,
       },
-
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.fn("NOW"),
       },
-
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal(
-          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-        ),
+        defaultValue: Sequelize.fn("NOW"),
       },
     });
-
-    // helpful index
-    await queryInterface.addIndex("EventAutomationSchedules", ["eventId"]);
-    await queryInterface.addIndex("EventAutomationSchedules", [
-      "startDateTime",
-    ]);
   },
 
-  async down(queryInterface) {
+  async down(queryInterface, Sequelize) {
     await queryInterface.dropTable("EventAutomationSchedules");
   },
 };

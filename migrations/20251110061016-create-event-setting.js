@@ -5,88 +5,91 @@ module.exports = {
     await queryInterface.createTable("EventSettings", {
       id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        autoIncrement: true,
         primaryKey: true,
+        autoIncrement: true,
+        allowNull: false,
       },
-
       eventId: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: "Events",
+          model: "Events", // Must match your Event table name
           key: "id",
         },
         onUpdate: "CASCADE",
         onDelete: "CASCADE",
       },
 
-      // channel / automation type
-      baseType: {
-        type: Sequelize.ENUM("sms", "whatsapp", "ai_call", "human_call"),
-        allowNull: false,
+      // Toggles
+      whatsappService: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+      },
+      smsService: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+      },
+      aiCallService: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+      },
+      humanCallService: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+      },
+      automaticSending: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
+      },
+      automaticPause: {
+        type: Sequelize.BOOLEAN,
+        defaultValue: false,
       },
 
-      // execution date only (YYYY-MM-DD)
-      executionDate: {
-        type: Sequelize.DATEONLY,
-        allowNull: false,
-      },
-
-      // order within same executionDate
-      stepOrder: {
+      // Day fields for WhatsApp
+      whatsappRounds: {
         type: Sequelize.INTEGER,
-        allowNull: false,
+        allowNull: true,
       },
-
-      // number of rounds
-      rounds: {
+      whatsappExecutionDays: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        defaultValue: 1,
+        allowNull: true,
       },
 
-      // optional label shown in UI
-      name: {
-        type: Sequelize.STRING,
+      // Day fields for AI Call
+      aiCallRounds: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+      aiCallExecutionDays: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+
+      // Day fields for Human Call
+      humanCallRounds: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+      },
+      humanCallExecutionDays: {
+        type: Sequelize.INTEGER,
         allowNull: true,
       },
 
       createdAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+        defaultValue: Sequelize.fn("NOW"),
       },
-
       updatedAt: {
         allowNull: false,
         type: Sequelize.DATE,
-        defaultValue: Sequelize.literal(
-          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
-        ),
+        defaultValue: Sequelize.fn("NOW"),
       },
     });
-
-    // 🔥 Indexes for fast automation queries
-    await queryInterface.addIndex("EventSettings", ["eventId"]);
-    await queryInterface.addIndex("EventSettings", [
-      "eventId",
-      "executionDate",
-    ]);
-    await queryInterface.addIndex("EventSettings", [
-      "eventId",
-      "executionDate",
-      "stepOrder",
-    ]);
-    await queryInterface.addIndex("EventSettings", ["baseType"]);
   },
 
-  async down(queryInterface) {
+  async down(queryInterface, Sequelize) {
     await queryInterface.dropTable("EventSettings");
-
-    // ENUM cleanup (important for Postgres, safe for MySQL)
-    await queryInterface.sequelize
-      .query('DROP TYPE IF EXISTS "enum_EventSettings_baseType";')
-      .catch(() => {});
   },
 };
