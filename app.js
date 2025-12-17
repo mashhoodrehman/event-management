@@ -26,17 +26,39 @@ const path = require("path");
 const app = express();
 
 // ✅ Enable CORS (important!)
+const allowedOrigins = [
+  "http://localhost:8080",
+  "http://localhost:3000",
+  "http://app-frontend-react.cvvm9olplp-gjy3m9eyd48q.p.temp-site.link",
+];
+
 app.use(
   cors({
-    origin: "http://localhost:8080", // your React app URL
-    credentials: true, // allow cookies/authorization headers if needed
+    origin: (origin, callback) => {
+      // allow Postman, mobile apps, server-to-server
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// 🔥 Required for browser preflight requests
+app.use(cors());
 
 // Middleware
 app.use(bodyParser.json());
 
 // Routes
+app.use("/api/stripe", stripeRoutes);
+
 app.use("/api/auth", authRoutes);
 app.use("/api/event-types", eventTypeRoutes);
 app.use("/api/event", eventRoutes);
