@@ -133,14 +133,14 @@ async function sendAutomationChargeEmail({
       .replace(/{{paymentDate}}/g, paymentDate)
       .replace(/{{year}}/g, new Date().getFullYear());
 
-    // await transporter.sendMail({
-    //   from: process.env.EMAIL_USER,
-    //   to: user.email,
-    //   subject: `Automation charge for event "${
-    //     event?.name || ""
-    //   }" - ${currency}${totalILS} (date: ${dateKey})`,
-    //   html: emailTemplate,
-    // });
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: `Automation charge for event "${
+        event?.name || ""
+      }" - ${currency}${totalILS} (date: ${dateKey})`,
+      html: emailTemplate,
+    });
 
     console.log(
       `Charge email sent to ${user.email} for payment ${payment.paymentIntentId}`
