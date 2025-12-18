@@ -168,7 +168,9 @@ const getAdminDashboardStats = async (req, res) => {
 
     const monthlyIncomeCentsRaw = await Payment.sum("amount", {
       where: {
-        status: "succeeded",
+        status: {
+          [Op.in]: ["succeeded", "initiated"],
+        },
         createdAt: {
           [Op.gte]: monthStart,
           [Op.lte]: today,

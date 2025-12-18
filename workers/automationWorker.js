@@ -20,37 +20,97 @@ const whatsappService = require("../services/whatsapp.service");
 const fs = require("fs");
 const path = require("path");
 const transporter = require("../config/email");
+const ServicePricing = require("../models/servicePricing.model");
 
-// ------ helpers shared with previous cron file ------
+let PRICING_CACHE = null; // { key: { priceAgorot, name, ... } }
+let PRICING_LAST_LOADED_AT = 0;
 
-const SMS_PRICE = parseInt(process.env.SMS_PRICE_AGOROT || "200", 10);
-const WHATSAPP_PRICE = parseInt(process.env.WHATSAPP_PRICE_AGOROT || "200", 10);
-const AICALL_PRICE = parseInt(process.env.AICALL_PRICE_AGOROT || "250", 10);
-const HUMANCALL_PRICE = parseInt(
-  process.env.HUMANCALL_PRICE_AGOROT || "1500",
-  10
+async function loadPricingCache(force = false) {
+  const TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+  if (!force && PRICING_CACHE && Date.now() - PRICING_LAST_LOADED_AT < TTL_MS) {
+    return PRICING_CACHE;
+  }
+
+  const rows = await ServicePricing.findAll();
+  const map = {};
+  for (const r of rows) {
+    map[r.key] = {
+      priceAgorot: Number(r.priceAgorot || 0),
+      name: r.name,
+      description: r.description,
+    };
+  }
+
+  PRICING_CACHE = map;
+  PRICING_LAST_LOADED_AT = Date.now();
+  return PRICING_CACHE;
+}
+
+// Warm cache on startup (optional but recommended)
+loadPricingCache(true).catch((e) =>
+  console.error("Failed to warm ServicePricing cache:", e)
 );
 
-function getPriceForType(type) {
+function getServiceKeyForAutomationType(type) {
   switch (type) {
     case "SMS":
-      return SMS_PRICE;
-    case "WhatsApp":
-      return WHATSAPP_PRICE;
-    case "AI_CALL":
-      return AICALL_PRICE;
-    case "HUMAN_CALL":
-      return HUMANCALL_PRICE;
-
-    // reminders reuse same unit price:
     case "REMINDER_SMS":
-      return SMS_PRICE;
+      return "sms_fee";
+
+    case "WhatsApp":
     case "REMINDER_WHATSAPP":
-      return WHATSAPP_PRICE;
+      return "whatsapp_fee";
+
+    case "AI_CALL":
+      return "ai_call_fee";
+
+    case "HUMAN_CALL":
+      return "human_call_fee";
+
     default:
-      return 0;
+      return null;
   }
 }
+
+async function getPriceForType(type) {
+  const pricing = await loadPricingCache(false);
+  const key = getServiceKeyForAutomationType(type);
+  if (!key) return 0;
+
+  const row = pricing[key];
+  return row ? Number(row.priceAgorot || 0) : 0;
+}
+// ------ helpers shared with previous cron file ------
+
+// const SMS_PRICE = parseInt(process.env.SMS_PRICE_AGOROT || "200", 10);
+// const WHATSAPP_PRICE = parseInt(process.env.WHATSAPP_PRICE_AGOROT || "200", 10);
+// const AICALL_PRICE = parseInt(process.env.AICALL_PRICE_AGOROT || "250", 10);
+// const HUMANCALL_PRICE = parseInt(
+//   process.env.HUMANCALL_PRICE_AGOROT || "1500",
+//   10
+// );
+
+// function getPriceForType(type) {
+//   switch (type) {
+//     case "SMS":
+//       return SMS_PRICE;
+//     case "WhatsApp":
+//       return WHATSAPP_PRICE;
+//     case "AI_CALL":
+//       return AICALL_PRICE;
+//     case "HUMAN_CALL":
+//       return HUMANCALL_PRICE;
+
+//     // reminders reuse same unit price:
+//     case "REMINDER_SMS":
+//       return SMS_PRICE;
+//     case "REMINDER_WHATSAPP":
+//       return WHATSAPP_PRICE;
+//     default:
+//       return 0;
+//   }
+// }
 
 function mapAutomationTypeToPaymentType(type) {
   switch (type) {
@@ -176,7 +236,7 @@ async function chargeAutomationBatchForDate({
   dateKey,
 }) {
   try {
-    const pricePerUnit = getPriceForType(type);
+    const pricePerUnit = await getPriceForType(type);
     if (!pricePerUnit) {
       console.warn(`No price configured for type ${type}, skipping billing.`);
       return true;
@@ -292,9 +352,16 @@ function getModelByName(modelName) {
   }
 }
 
+// const connection = {
+//   host: process.env.REDIS_HOST || "127.0.0.1",
+//   port: Number(process.env.REDIS_PORT || 6379),
+// };
+
 const connection = {
   host: process.env.REDIS_HOST || "127.0.0.1",
   port: Number(process.env.REDIS_PORT || 6379),
+  username: process.env.REDIS_USERNAME,
+  password: process.env.REDIS_PASSWORD, // ✅ THIS FIXES NOAUTH
 };
 
 const worker = new Worker(

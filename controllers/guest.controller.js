@@ -173,6 +173,7 @@ const getGuestDetails = async (req, res) => {
             "locationLng",
             "eventDate",
             "description",
+            "invitationFile",
           ],
         },
       ],
@@ -200,6 +201,7 @@ const getGuestDetails = async (req, res) => {
             locationLat: guest.Event.locationLat,
             locationLng: guest.Event.locationLng,
             description: guest.Event.description,
+            invitationFile: guest.Event.invitationFile,
           }
         : null,
     });
