@@ -29,6 +29,7 @@ const app = express();
 const allowedOrigins = [
   "http://localhost:8080",
   "http://localhost:3000",
+  "https://aridar-cms.revuity.com",
   "http://app-frontend-react.cvvm9olplp-gjy3m9eyd48q.p.temp-site.link",
 ];
 
