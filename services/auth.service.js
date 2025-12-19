@@ -32,7 +32,7 @@ const signup = async ({ name, email, password, type }) => {
     verificationToken,
   });
 
-  const verificationLink = `http://app-backend.cvvm9olplp-gjy3m9eyd48q.p.temp-site.link/api/auth/verify?token=${verificationToken}`;
+  const verificationLink = `https://aridar-cms-api.revuity.com/api/auth/verify?token=${verificationToken}`;
   let emailTemplate = loadTemplate("verificationEmail.html");
 
   emailTemplate = emailTemplate
