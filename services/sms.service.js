@@ -3,6 +3,11 @@ require("dotenv").config();
 const axios = require("axios");
 const MessageTemplate = require("../models/messageTemplate.model");
 
+const normalizePhoneNumber = (phone) => {
+  if (!phone) return phone;
+  return phone.replace(/^\+/, ""); // removes only leading +
+};
+
 module.exports = {
   /**
    * Fetch dynamic message using templateId
@@ -36,6 +41,7 @@ module.exports = {
       // const link = `${baseUrl}?token=${rsvpToken}`;
       // const finalMessage = `${message}\nRSVP here: ${link}`;
       let finalMessage = message;
+      const cleanedPhoneNumber = normalizePhoneNumber(phoneNumber);
 
       if (rsvpToken) {
         const baseUrl =
@@ -47,14 +53,15 @@ module.exports = {
           finalMessage = `${message}\nRSVP here: ${link}`;
         }
       }
+      console.log(cleanedPhoneNumber, "phone number ");
       const requestBody = {
         sms: {
           user: {
             username: process.env.SMS_API_USERNAME || "simtlv99",
           },
-          source: senderName,
+          source: process.env.SMS_SOURCE_NAME || "SIMTLV",
           destinations: {
-            phone: phoneNumber,
+            phone: cleanedPhoneNumber,
           },
           message: finalMessage,
         },
