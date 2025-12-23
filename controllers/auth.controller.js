@@ -58,3 +58,22 @@ exports.getProfile = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+exports.forgotPassword = async (req, res) => {
+    try {
+      const response = await AuthService.forgotPassword(req.body.email); 
+      res.status(200).json(response);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;    
+    const response = await AuthService.resetPassword(token, req.body.password); 
+    res.status(200).json(response);
+  } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+;}

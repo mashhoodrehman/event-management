@@ -4,11 +4,10 @@ const MessageTemplate = require("../models/messageTemplate.model");
 
 // 🔹 GREEN API CONFIG
 const GREEN_API_URL =
-  "https://7105.api.greenapi.com/waInstance7105420574/sendMessage/115cbe965e8a4d0fb36c6e0949cc23cc7d561b0c52114fecaf";
+  "https://7105.api.greenapi.com/waInstance7105436288/sendMessage/26aa249c79cd41be8bf2772cf14b3850f169e8e0a316443b9f";
 
 // 🔹 HARD CODED PAKISTAN NUMBER (testing)
-// const HARD_CODED_CHAT_ID = "923324505905@c.us";
-const HARD_CODED_CHAT_ID = "972543982101@c.us";
+const HARD_CODED_CHAT_ID = "3061435349@c.us";
 
 /**
  * Build PUBLIC RSVP link (never localhost)
