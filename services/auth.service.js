@@ -128,7 +128,7 @@ const forgotPassword = async (email) => {
   user.updatedAt = new Date(); 
   await user.save();
 
-  const resetLink = `${process.env.BASE_URL}/reset-password/${token}`;
+  const resetLink = `https://aridar-cms.revuity.com/reset-password/${token}`;
   await sendResetEmail(email, resetLink); 
   return {
     message: "Password reset link sent",
