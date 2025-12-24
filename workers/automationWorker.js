@@ -517,11 +517,11 @@ const worker = new Worker(
             }
           );
 
-          await whatsappService.sendWhatsAppTemplate(
-            task.guestNumber,
-            message,
-            task.rsvpToken
-          );
+          // await whatsappService.sendWhatsAppTemplate(
+          //   task.guestNumber,
+          //   message,
+          //   task.rsvpToken
+          // );
           task.status = "success";
           await task.save();
           console.log(`WhatsApp sent to ${task.guestNumber}`);
