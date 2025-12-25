@@ -529,10 +529,14 @@ const worker = new Worker(
         }
 
         case "AI_CALL":
+          task.status = "success";
+          await task.save();
           console.log(`AI call triggered for ${task.guestNumber}`);
           break;
 
         case "HUMAN_CALL":
+          task.status = "success";
+          await task.save();
           console.log(`Human call triggered for ${task.guestNumber}`);
           break;
 
