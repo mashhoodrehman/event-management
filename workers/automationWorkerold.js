@@ -5,7 +5,6 @@ const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 const { automationQueue } = require("../queues/automationQueue");
-const EventSetting = require("../models/eventSetting.model");
 const SMSAutomation = require("../models/smsAutomation.model");
 const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
@@ -148,29 +147,6 @@ function humanizeAutomationType(type) {
   }
 }
 
-function getEventTypeKeyForCall(eventTypeName) {
-  // Map event type name to plural key for the API call
-  if (!eventTypeName) return "events";
-  
-  const normalized = eventTypeName.toLowerCase().trim();
-  
-  switch (normalized) {
-    case "wedding":
-      return "weddings";
-    case "birthday":
-      return "birthdays";
-    case "concerts":
-      return "concerts";
-    case "corporate_event":
-      return "corporate_event";
-    case "charity_event":
-      return "charity_event";
-    default:
-      // Fallback: pluralize by adding 's'
-      return `${normalized}s`;
-  }
-}
-
 function loadTemplate(fileName) {
   const filePath = path.join(__dirname, "..", "templates", fileName);
   return fs.readFileSync(filePath, "utf8");
@@ -250,7 +226,6 @@ function getDateRangeForKey(dateKey) {
 
 /**
  * Charge once for ALL unbilled tasks of a given event+type+date.
- * Filters tasks based on guest status to charge only for automations that will actually be sent.
  */
 async function chargeAutomationBatchForDate({
   user,
@@ -274,41 +249,8 @@ async function chargeAutomationBatchForDate({
       return false;
     }
 
-    // const amountCents = pricePerUnit * tasksForDate.length
-    // Get all guests for this event to check their status
-    const guests = await Guest.findAll({ where: { eventId: event.id } });
-    const guestByToken = new Map(guests.map((g) => [g.rsvpToken, g]));
-
-    // Determine which tasks will actually be sent based on guest status filters
-    const firstAutomationType = await getFirstAutomationTypeForEvent(event.id);
-    let tasksToCharge = tasksForDate;
-
-    if (type !== "REMINDER_SMS" && type !== "REMINDER_WHATSAPP") {
-      if (type !== firstAutomationType) {
-        // Non-first automations: only charge for pending/hesitate guests
-        const allowedStatuses = ["pending", "hesitate"];
-        tasksToCharge = tasksForDate.filter((task) => {
-          const guest = guestByToken.get(task.rsvpToken);
-          return guest && allowedStatuses.includes(guest.status);
-        });
-      }
-      // else: first automation sends to everyone, so tasksToCharge = tasksForDate
-    }
-
-    if (tasksToCharge.length === 0) {
-      console.log(`No billable tasks for ${type} on ${dateKey}, skipping charge.`);
-      return true;
-    }
-
-    let amountCents = pricePerUnit * tasksToCharge.length;
+    const amountCents = pricePerUnit * tasksForDate.length;
     if (amountCents <= 0) return true;
-
-    // If total amount is less than 10 ILS (1000 agorot), add 0.8 ILS (80 agorot) tax
-    let taxAgorot = 0;
-    if (amountCents < 1000) {
-      taxAgorot = 80; // 0.8 ILS
-      amountCents += taxAgorot;
-    }
 
     const pms = await stripe.paymentMethods.list({
       customer: user.stripeCustomerId,
@@ -340,7 +282,6 @@ async function chargeAutomationBatchForDate({
         automationType: type,
         batchSize: String(tasksForDate.length),
         automationDate: dateKey,
-        taxAgorot: String(taxAgorot),
       },
     });
 
@@ -372,18 +313,17 @@ async function chargeAutomationBatchForDate({
       user,
       event,
       type,
-      quantity: tasksToCharge.length,
+      quantity: tasksForDate.length,
       unitPriceAgorot: pricePerUnit,
       totalAgorot: amountCents,
       payment,
       dateKey,
     });
 
-    // Mark only the billable tasks as billed
-    const billableIds = tasksToCharge.map((t) => t.id);
+    const ids = tasksForDate.map((t) => t.id);
     await model.update(
       { billingPaymentId: payment.id },
-      { where: { id: { [Op.in]: billableIds } } }
+      { where: { id: { [Op.in]: ids } } }
     );
 
     return true;
@@ -394,39 +334,6 @@ async function chargeAutomationBatchForDate({
 }
 
 // ------ WORKER ------
-
-/**
- * Get the first automation type for an event based on EventSetting execution order.
- * Returns the baseType (e.g., 'sms', 'whatsapp', 'ai_call', 'human_call') mapped to
- * our internal type strings ('SMS', 'WhatsApp', 'AI_CALL', 'HUMAN_CALL').
- */
-async function getFirstAutomationTypeForEvent(eventId) {
-  
-  const firstStep = await EventSetting.findOne({
-    where: { eventId },
-    order: [
-      ["executionDate", "ASC"],
-      ["stepOrder", "ASC"],
-      ["id", "ASC"],
-    ],
-  });
-
-  if (!firstStep) return null;
-
-  // Map baseType to our internal type strings
-  switch (firstStep.baseType) {
-    case "sms":
-      return "SMS";
-    case "whatsapp":
-      return "WhatsApp";
-    case "ai_call":
-      return "AI_CALL";
-    case "human_call":
-      return "HUMAN_CALL";
-    default:
-      return null;
-  }
-}
 
 function getModelByName(modelName) {
   switch (modelName) {
@@ -530,40 +437,18 @@ const worker = new Worker(
     }
 
     // 2) SKIP CONFIRMED GUESTS (same as old automaticPause behavior)
-    // if (
-    //   guest &&
-    //   guest.status === "confirmed" &&
-    //   type !== "REMINDER_SMS" &&
-    //   type !== "REMINDER_WHATSAPP"
-    // ) {
-    //   console.log(
-    //     `Skipping ${type} for confirmed guest ${guest.name} (${guest.phone})`
-    //   );
-    //   task.status = "success";
-    //   await task.save();
-    //   return;
-    // }
-
-    // 2) FILTER BY GUEST STATUS
-    // - The first automation (dynamically determined) should run for all guests.
-    // - Remaining automations (WhatsApp, AI_CALL, HUMAN_CALL) should run
-    //   only for guests with status 'pending' or 'hesitate'.
-    if (type !== "REMINDER_SMS" && type !== "REMINDER_WHATSAPP") {
-      const firstAutomationType = await getFirstAutomationTypeForEvent(event.id);
-      
-      if (type === firstAutomationType) {
-        // first automation — send to everyone
-      } else {
-        const allowedStatuses = ["pending", "hesitate"];
-        if (!guest || !allowedStatuses.includes(guest.status)) {
-          console.log(
-            `Skipping ${type} for guest ${guest ? guest.name : task.guestNumber} (status=${guest ? guest.status : 'missing'})`
-          );
-          task.status = "success";
-          await task.save();
-          return;
-        }
-      }
+    if (
+      guest &&
+      guest.status === "confirmed" &&
+      type !== "REMINDER_SMS" &&
+      type !== "REMINDER_WHATSAPP"
+    ) {
+      console.log(
+        `Skipping ${type} for confirmed guest ${guest.name} (${guest.phone})`
+      );
+      task.status = "success";
+      await task.save();
+      return;
     }
 
     // 3) SEND AUTOMATION
@@ -643,65 +528,11 @@ const worker = new Worker(
           break;
         }
 
-        case "AI_CALL": {
+        case "AI_CALL":
+          task.status = "success";
+          await task.save();
           console.log(`AI call triggered for ${task.guestNumber}`);
-
-          try {
-            const eventDateObjForCall = event?.eventDate || null;
-            let callDate = "";
-            let callTime = "";
-            if (eventDateObjForCall) {
-              const dt = new Date(eventDateObjForCall);
-              callDate = dt.toLocaleDateString("he-IL");
-              callTime = dt.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-            }
-
-            // Load EventType to get the type name (wedding, birthday, etc.)
-            const EventType = require("../models/eventType.model");
-            const eventType = await EventType.findByPk(event.typeId);
-            const eventTypeKey = getEventTypeKeyForCall(eventType?.name || "event");
-
-            const response = await fetch(
-              "https://ingestion-api-291837461617.me-west1.run.app/submit-call",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  customer_name: guest?.name || "",
-                  number: task.guestNumber,
-                  id: String(task.id),
-                  [eventTypeKey]: {
-                    [event?.name || ""]: {
-                      date: callDate,
-                      time: callTime,
-                      location: event?.location || "",
-                    },
-                  },
-                }),
-              }
-            );
-
-            if (!response.ok) {
-              throw new Error(
-                `API returned ${response.status}: ${response.statusText}`
-              );
-            }
-
-            const data = await response.json();
-            console.log("AI call API response:", data);
-
-            task.status = "success";
-            await task.save();
-          } catch (err) {
-            console.error(`AI call API failed for ${task.guestNumber}:`, err);
-            task.status = "failed";
-            await task.save();
-          }
-
           break;
-        }
 
         case "HUMAN_CALL":
           task.status = "success";
