@@ -672,6 +672,8 @@ const worker = new Worker(
                   customer_name: guest?.name || "",
                   number: task.guestNumber,
                   id: String(task.id),
+                  event_id: String(event.id),
+                  user_id: String(event.userId),
                   [eventTypeKey]: {
                     [event?.name || ""]: {
                       date: callDate,

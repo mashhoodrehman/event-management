@@ -7,6 +7,7 @@ const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const { formatTimeAgo } = require("../utils/timeAgo");
+const ActivityService = require("../services/activityService");
 
 /**
  * Update guest RSVP status
@@ -298,6 +299,16 @@ const getRecentActivity = async (req, res) => {
   }
 };
 
+const getWeeklyActivity = async (req, res) => {
+  try { 
+    const { eventId } = req.query;
+    const data = await ActivityService.getWeeklyActivity(eventId);
+    res.json(data); 
+  } catch (err) { 
+    res.status(500).json({ error: err.message }); 
+  } 
+};
+
 const getGuestStats = async (req, res) => {
   try {
     const { eventId } = req.query;
@@ -517,4 +528,5 @@ module.exports = {
   getGuestStats,
   getPendingFollowupGuests,
   addGuestManual,
+  getWeeklyActivity,
 };

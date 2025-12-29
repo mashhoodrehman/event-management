@@ -8,6 +8,7 @@ const {
   getGuestStats,
   getPendingFollowupGuests,
   addGuestManual,
+  getWeeklyActivity,
 } = require("../controllers/guest.controller");
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -21,6 +22,8 @@ router.get("/details", getGuestDetails);
 router.get("/list", authMiddleware, getGuestsByFilters);
 
 router.get("/recent-activity", authMiddleware, getRecentActivity);
+
+router.get("/weekly-activity", authMiddleware, getWeeklyActivity);
 
 router.get("/stats", authMiddleware, getGuestStats);
 
