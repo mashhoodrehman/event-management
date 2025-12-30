@@ -25,6 +25,7 @@ router.post("/ai-call", async (req, res) => {
       });
     }
 
+    // fetch guest by customer_id
     const Guest = require("../models/guest.model");
     const guest = await Guest.findOne({
       where: { id: customer_id },
