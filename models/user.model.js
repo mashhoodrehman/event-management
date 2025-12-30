@@ -44,6 +44,11 @@ const User = sequelize.define("User", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  timezone: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: "UTC",
+  },
 });
 
 module.exports = User;
