@@ -9,6 +9,7 @@ const {
   getPendingFollowupGuests,
   addGuestManual,
   getWeeklyActivity,
+  getConfirmedGuestsWithHistory,
 } = require("../controllers/guest.controller");
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -28,5 +29,8 @@ router.get("/weekly-activity", authMiddleware, getWeeklyActivity);
 router.get("/stats", authMiddleware, getGuestStats);
 
 router.get("/pending-followup", authMiddleware, getPendingFollowupGuests);
+
+// GET /api/guest/confirmed-with-history?eventId=X&page=1&limit=20
+router.get("/confirmed-with-history", authMiddleware, getConfirmedGuestsWithHistory);
 
 module.exports = router;

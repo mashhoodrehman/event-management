@@ -722,13 +722,13 @@ const updateAutomationSettings = async (req, res) => {
     const futureRows =
       futureSteps.length > 0
         ? futureSteps.map((s) => ({
-            eventId,
-            baseType: normalizeBaseType(s.baseType),
-            executionDate: s.runDate,
-            stepOrder: s.order ?? 1,
-            rounds: s.rounds || 1,
-            name: s.name || null,
-          }))
+          eventId,
+          baseType: normalizeBaseType(s.baseType),
+          executionDate: s.runDate,
+          stepOrder: s.order ?? 1,
+          rounds: s.rounds || 1,
+          name: s.name || null,
+        }))
         : [];
 
     if (futureRows.length > 0) {
@@ -741,17 +741,17 @@ const updateAutomationSettings = async (req, res) => {
     const todayRows =
       todaySteps.length > 0
         ? await Promise.all(
-            todaySteps.map((s) =>
-              EventSetting.create({
-                eventId,
-                baseType: normalizeBaseType(s.baseType),
-                executionDate: s.runDate, // todayKey
-                stepOrder: s.order ?? 1,
-                rounds: s.rounds || 1,
-                name: s.name || null,
-              })
-            )
+          todaySteps.map((s) =>
+            EventSetting.create({
+              eventId,
+              baseType: normalizeBaseType(s.baseType),
+              executionDate: s.runDate, // todayKey
+              stepOrder: s.order ?? 1,
+              rounds: s.rounds || 1,
+              name: s.name || null,
+            })
           )
+        )
         : [];
 
     // ✅ 3) delete FUTURE pending automation tasks, keep today's tasks as-is
@@ -1292,6 +1292,53 @@ const getEventAutomationSteps = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/event/invitation/:eventId
+ * Replaces or removes the invitation file for an existing event.
+ * Send multipart/form-data with field `invitationFile` to upload a new file.
+ * Send JSON body { remove: true } (no file) to clear the invitation.
+ */
+const fs = require("fs");
+const path = require("path");
+
+const updateInvitation = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { eventId } = req.params;
+    const remove = req.body?.remove === "true" || req.body?.remove === true;
+
+    const event = await Event.findOne({ where: { id: eventId, userId } });
+    if (!event) return res.status(404).json({ error: "Event not found or unauthorized" });
+
+    const oldFile = event.invitationFile;
+    const deleteOld = () => {
+      if (!oldFile) return;
+      const oldPath = path.join(__dirname, "..", "uploads", "invitations", oldFile);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    };
+
+    if (remove) {
+      // Clear invitation
+      deleteOld();
+      await event.update({ invitationFile: null });
+      return res.json({ success: true, invitationFile: null });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Replace old file
+    deleteOld();
+    await event.update({ invitationFile: req.file.filename });
+
+    return res.json({ success: true, invitationFile: req.file.filename });
+  } catch (err) {
+    console.error("updateInvitation error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   createOrUpdateEvent,
   addOrUpdateGuests,
@@ -1303,6 +1350,7 @@ module.exports = {
   getChannelResponseRates,
   getEventAutomationSteps,
   updateAutomationSettings,
+  updateInvitation,
 };
 
 // const Event = require("../models/event.model");

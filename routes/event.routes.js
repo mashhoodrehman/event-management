@@ -15,6 +15,7 @@ const {
   getUserEvents,
   getEventAutomationStats,
   getChannelResponseRates,
+  updateInvitation,
 } = require("../controllers/event.controller");
 const {
   processSetupFee,
@@ -58,6 +59,14 @@ router.get(
   "/channel-response/:eventId",
   authMiddleware,
   getChannelResponseRates
+);
+
+// PATCH /api/event/invitation/:eventId — upload or remove invitation file
+router.patch(
+  "/invitation/:eventId",
+  authMiddleware,
+  upload.single("invitationFile"),
+  updateInvitation
 );
 
 // router.post(
