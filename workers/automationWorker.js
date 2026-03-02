@@ -3,6 +3,7 @@ const { Worker } = require("bullmq");
 const { Op } = require("sequelize");
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const moment = require("moment-timezone");
 
 const { automationQueue } = require("../queues/automationQueue");
 const EventSetting = require("../models/eventSetting.model");
@@ -151,9 +152,9 @@ function humanizeAutomationType(type) {
 function getEventTypeKeyForCall(eventTypeName) {
   // Map event type name to plural key for the API call
   if (!eventTypeName) return "events";
-  
+
   const normalized = eventTypeName.toLowerCase().trim();
-  
+
   switch (normalized) {
     case "wedding":
       return "weddings";
@@ -220,9 +221,8 @@ async function sendAutomationChargeEmail({
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: `Automation charge for event "${
-        event?.name || ""
-      }" - ${currency}${totalILS} (date: ${dateKey})`,
+      subject: `Automation charge for event "${event?.name || ""
+        }" - ${currency}${totalILS} (date: ${dateKey})`,
       html: emailTemplate,
     });
 
@@ -401,7 +401,7 @@ async function chargeAutomationBatchForDate({
  * our internal type strings ('SMS', 'WhatsApp', 'AI_CALL', 'HUMAN_CALL').
  */
 async function getFirstAutomationTypeForEvent(eventId) {
-  
+
   const firstStep = await EventSetting.findOne({
     where: { eventId },
     order: [
@@ -455,6 +455,29 @@ const connection = {
   port: Number(process.env.REDIS_PORT || 6379),
 };
 
+function isWithinBusinessHours(userTimezone) {
+  const now = moment().tz(userTimezone || "UTC");
+  const hour = now.hour();
+  return hour >= 10 && hour < 18;
+}
+
+function getNextBusinessHourDelay(userTimezone) {
+  const now = moment().tz(userTimezone || "UTC");
+  const hour = now.hour();
+
+  if (hour < 10) {
+    // Before 10 AM - wait until 10 AM today
+    const next10AM = now.clone().hour(10).minute(0).second(0);
+    return next10AM.diff(now);
+  } else if (hour >= 18) {
+    // After 6 PM - wait until 10 AM tomorrow
+    const next10AM = now.clone().add(1, 'day').hour(10).minute(0).second(0);
+    return next10AM.diff(now);
+  }
+
+  return 0; // Within business hours
+}
+
 const worker = new Worker(
   "automationQueue",
   async (job) => {
@@ -485,6 +508,23 @@ const worker = new Worker(
       console.warn(`User ${event.userId} not found for task ${task.id}`);
       task.status = "failed";
       await task.save();
+      return;
+    }
+
+
+    // Check if current time is within business hours (10 AM to 6 PM) in user's timezone
+    if (!isWithinBusinessHours(user.timezone)) {
+      const delayMs = getNextBusinessHourDelay(user.timezone);
+
+      console.log(`Rescheduling ${type} for user ${user.id} (${user.name}) - outside business hours in timezone ${user.timezone}. Will retry in ${Math.round(delayMs / 1000 / 60)} minutes`);
+
+      // Re-enqueue the job to run at next business hour
+      await automationQueue.add(
+        "send-automation",
+        { type, modelName, taskId },
+        { delay: delayMs, attempts: 3 }
+      );
+
       return;
     }
 
@@ -550,7 +590,7 @@ const worker = new Worker(
     //   only for guests with status 'pending' or 'hesitate'.
     if (type !== "REMINDER_SMS" && type !== "REMINDER_WHATSAPP") {
       const firstAutomationType = await getFirstAutomationTypeForEvent(event.id);
-      
+
       if (type === firstAutomationType) {
         // first automation — send to everyone
       } else {

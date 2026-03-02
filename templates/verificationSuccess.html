@@ -1,4 +1,10 @@
-<html>
+<!DOCTYPE html>
+<html lang="he">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>אימות חשבון הצליח</title>
+  </head>
   <body
     style="
       margin: 0;
@@ -6,19 +12,22 @@
       font-family: 'Arial', sans-serif;
       direction: rtl;
       text-align: right;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     "
   >
     <table
       width="100%"
-      height="100%"
       cellpadding="0"
       cellspacing="0"
-      style="text-align: center; padding-top: 80px"
+      style="text-align: center"
     >
       <tr>
         <td align="center">
           <table
-            width="420"
+            width="75%"
             style="
               background: white;
               border-radius: 12px;
@@ -29,6 +38,10 @@
             <tr>
               <td>
                 <div style="font-size: 48px; margin-bottom: 15px">🎉</div>
+
+                <h3 style="color: #888; font-size: 18px; margin: 0 0 8px">
+                  שלום, {{userName}}! 👋
+                </h3>
 
                 <h1 style="color: #2c2c2c; margin: 0 0 10px; font-size: 28px">
                   החשבון אומת בהצלחה!

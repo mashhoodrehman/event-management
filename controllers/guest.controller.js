@@ -340,14 +340,23 @@ const getGuestStats = async (req, res) => {
     }
 
     // ✅ Count guests per status
-    const [totalGuests, confirmed, cancel, hesitate, pending] =
-      await Promise.all([
-        Guest.count({ where: { eventId } }),
-        Guest.count({ where: { eventId, status: "confirmed" } }),
-        Guest.count({ where: { eventId, status: "cancel" } }),
-        Guest.count({ where: { eventId, status: "hesitate" } }),
-        Guest.count({ where: { eventId, status: "pending" } }),
-      ]);
+    const [
+      totalGuests,
+      confirmed,
+      cancel,
+      hesitate,
+      pending,
+      totalPeople,
+      totalConfirmedPeople,
+    ] = await Promise.all([
+      Guest.count({ where: { eventId } }),
+      Guest.count({ where: { eventId, status: "confirmed" } }),
+      Guest.count({ where: { eventId, status: "cancel" } }),
+      Guest.count({ where: { eventId, status: "hesitate" } }),
+      Guest.count({ where: { eventId, status: "pending" } }),
+      Guest.sum("peopleCount", { where: { eventId } }),
+      Guest.sum("peopleCount", { where: { eventId, status: "confirmed" } }),
+    ]);
 
     const waiting = pending + hesitate;
     const responded = confirmed + cancel + hesitate;
@@ -360,6 +369,8 @@ const getGuestStats = async (req, res) => {
     return res.status(200).json({
       eventId: Number(eventId),
       totalGuests,
+      totalPeople: totalPeople || 0,
+      totalConfirmedPeople: totalConfirmedPeople || 0,
       statuses: {
         pending,
         confirmed,

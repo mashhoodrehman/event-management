@@ -13,13 +13,17 @@ function loadTemplate(fileName) {
 }
 
 // 🧠 Signup with email verification
-const signup = async ({ name, email, password, type }) => {
+const signup = async (req) => {
+  const { name, email, password, type, timezone } = req.body;
+
   if (!["personal", "agency"].includes(type)) {
     throw new Error("Invalid user type. Must be 'personal' or 'agency'.");
   }
 
   const existingUser = await User.findOne({ where: { email } });
   if (existingUser) throw new Error("User already exists");
+
+  const userTimezone = timezone || 'UTC';
 
   const hashedPassword = await bcrypt.hash(password, 10);
   const verificationToken = crypto.randomBytes(32).toString("hex");
@@ -29,6 +33,7 @@ const signup = async ({ name, email, password, type }) => {
     email,
     password: hashedPassword,
     type, // 👈 added type
+    timezone : userTimezone,
     verificationToken,
   });
 
@@ -104,6 +109,11 @@ const verifyAccount = async (token, res) => {
     /{{loginUrl}}/g,
     process.env.FRONTEND_LOGIN_URL
   );
+  successHtml = successHtml.replace(
+    /{{userName}}/g,
+    user.name
+  );
+  
   return successHtml;
 };
 

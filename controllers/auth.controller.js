@@ -2,7 +2,7 @@ const AuthService = require("../services/auth.service");
 
 exports.signup = async (req, res) => {
   try {
-    const response = await AuthService.signup(req.body);
+    const response = await AuthService.signup(req);
     res.status(201).json(response);
   } catch (error) {
     res.status(400).json({ error: error.message });
