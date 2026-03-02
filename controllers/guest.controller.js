@@ -194,16 +194,16 @@ const getGuestDetails = async (req, res) => {
       },
       event: guest.Event
         ? {
-            id: guest.Event.id,
-            name: guest.Event.name,
-            location: guest.Event.location,
-            startTime: guest.Event.eventDate,
-            locationName: guest.Event.locationName,
-            locationLat: guest.Event.locationLat,
-            locationLng: guest.Event.locationLng,
-            description: guest.Event.description,
-            invitationFile: guest.Event.invitationFile,
-          }
+          id: guest.Event.id,
+          name: guest.Event.name,
+          location: guest.Event.location,
+          startTime: guest.Event.eventDate,
+          locationName: guest.Event.locationName,
+          locationLat: guest.Event.locationLat,
+          locationLng: guest.Event.locationLng,
+          description: guest.Event.description,
+          invitationFile: guest.Event.invitationFile,
+        }
         : null,
     });
   } catch (err) {
@@ -300,13 +300,13 @@ const getRecentActivity = async (req, res) => {
 };
 
 const getWeeklyActivity = async (req, res) => {
-  try { 
+  try {
     const { eventId } = req.query;
     const data = await ActivityService.getWeeklyActivity(eventId);
-    res.json(data); 
-  } catch (err) { 
-    res.status(500).json({ error: err.message }); 
-  } 
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 };
 
 const getGuestStats = async (req, res) => {
@@ -328,14 +328,23 @@ const getGuestStats = async (req, res) => {
     }
 
     // ✅ Count guests per status
-    const [totalGuests, confirmed, cancel, hesitate, pending] =
-      await Promise.all([
-        Guest.count({ where: { eventId } }),
-        Guest.count({ where: { eventId, status: "confirmed" } }),
-        Guest.count({ where: { eventId, status: "cancel" } }),
-        Guest.count({ where: { eventId, status: "hesitate" } }),
-        Guest.count({ where: { eventId, status: "pending" } }),
-      ]);
+    const [
+      totalGuests,
+      confirmed,
+      cancel,
+      hesitate,
+      pending,
+      totalPeople,
+      totalConfirmedPeople,
+    ] = await Promise.all([
+      Guest.count({ where: { eventId } }),
+      Guest.count({ where: { eventId, status: "confirmed" } }),
+      Guest.count({ where: { eventId, status: "cancel" } }),
+      Guest.count({ where: { eventId, status: "hesitate" } }),
+      Guest.count({ where: { eventId, status: "pending" } }),
+      Guest.sum("peopleCount", { where: { eventId } }),
+      Guest.sum("peopleCount", { where: { eventId, status: "confirmed" } }),
+    ]);
 
     const waiting = pending + hesitate;
     const responded = confirmed + cancel + hesitate;
@@ -348,6 +357,8 @@ const getGuestStats = async (req, res) => {
     return res.status(200).json({
       eventId: Number(eventId),
       totalGuests,
+      totalPeople: totalPeople || 0,
+      totalConfirmedPeople: totalConfirmedPeople || 0,
       statuses: {
         pending,
         confirmed,
