@@ -152,9 +152,9 @@ function humanizeAutomationType(type) {
 function getEventTypeKeyForCall(eventTypeName) {
   // Map event type name to plural key for the API call
   if (!eventTypeName) return "events";
-  
+
   const normalized = eventTypeName.toLowerCase().trim();
-  
+
   switch (normalized) {
     case "wedding":
       return "weddings";
@@ -221,9 +221,8 @@ async function sendAutomationChargeEmail({
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: `Automation charge for event "${
-        event?.name || ""
-      }" - ${currency}${totalILS} (date: ${dateKey})`,
+      subject: `Automation charge for event "${event?.name || ""
+        }" - ${currency}${totalILS} (date: ${dateKey})`,
       html: emailTemplate,
     });
 
@@ -402,7 +401,7 @@ async function chargeAutomationBatchForDate({
  * our internal type strings ('SMS', 'WhatsApp', 'AI_CALL', 'HUMAN_CALL').
  */
 async function getFirstAutomationTypeForEvent(eventId) {
-  
+
   const firstStep = await EventSetting.findOne({
     where: { eventId },
     order: [
@@ -465,7 +464,7 @@ function isWithinBusinessHours(userTimezone) {
 function getNextBusinessHourDelay(userTimezone) {
   const now = moment().tz(userTimezone || "UTC");
   const hour = now.hour();
-  
+
   if (hour < 10) {
     // Before 10 AM - wait until 10 AM today
     const next10AM = now.clone().hour(10).minute(0).second(0);
@@ -475,7 +474,7 @@ function getNextBusinessHourDelay(userTimezone) {
     const next10AM = now.clone().add(1, 'day').hour(10).minute(0).second(0);
     return next10AM.diff(now);
   }
-  
+
   return 0; // Within business hours
 }
 
@@ -512,20 +511,20 @@ const worker = new Worker(
       return;
     }
 
-  
+
     // Check if current time is within business hours (10 AM to 6 PM) in user's timezone
     if (!isWithinBusinessHours(user.timezone)) {
       const delayMs = getNextBusinessHourDelay(user.timezone);
-      
+
       console.log(`Rescheduling ${type} for user ${user.id} (${user.name}) - outside business hours in timezone ${user.timezone}. Will retry in ${Math.round(delayMs / 1000 / 60)} minutes`);
-      
+
       // Re-enqueue the job to run at next business hour
       await automationQueue.add(
         "send-automation",
         { type, modelName, taskId },
         { delay: delayMs, attempts: 3 }
       );
-      
+
       return;
     }
 
@@ -591,7 +590,7 @@ const worker = new Worker(
     //   only for guests with status 'pending' or 'hesitate'.
     if (type !== "REMINDER_SMS" && type !== "REMINDER_WHATSAPP") {
       const firstAutomationType = await getFirstAutomationTypeForEvent(event.id);
-      
+
       if (type === firstAutomationType) {
         // first automation — send to everyone
       } else {
@@ -714,7 +713,7 @@ const worker = new Worker(
                   number: task.guestNumber,
                   id: String(task.id),
                   event_id: String(event.id),
-                  customer_id: String(guest?.id || ""),
+                  user_id: String(event.userId),
                   [eventTypeKey]: {
                     [event?.name || ""]: {
                       date: callDate,
