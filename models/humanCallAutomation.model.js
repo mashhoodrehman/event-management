@@ -65,6 +65,14 @@ const HumanCallAutomation = sequelize.define("HumanCallAutomation", {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
+  isTriggered: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  billingClaimedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
 module.exports = HumanCallAutomation;

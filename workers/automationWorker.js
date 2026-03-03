@@ -295,8 +295,15 @@ async function chargeAutomationBatchForDate({
       // else: first automation sends to everyone, so tasksToCharge = tasksForDate
     }
 
+    const allTaskIds = tasksForDate.map((t) => t.id);
+
     if (tasksToCharge.length === 0) {
       console.log(`No billable tasks for ${type} on ${dateKey}, skipping charge.`);
+      // Mark all in this batch as processed (0) so other workers skip them
+      await model.update(
+        { billingPaymentId: 0 },
+        { where: { id: { [Op.in]: allTaskIds } } }
+      );
       return true;
     }
 
@@ -379,12 +386,23 @@ async function chargeAutomationBatchForDate({
       dateKey,
     });
 
-    // Mark only the billable tasks as billed
+    // Mark all tasks in this batch
     const billableIds = tasksToCharge.map((t) => t.id);
-    await model.update(
-      { billingPaymentId: payment.id },
-      { where: { id: { [Op.in]: billableIds } } }
-    );
+    const skippedIds = allTaskIds.filter((id) => !billableIds.includes(id));
+
+    if (billableIds.length > 0) {
+      await model.update(
+        { billingPaymentId: payment.id },
+        { where: { id: { [Op.in]: billableIds } } }
+      );
+    }
+
+    if (skippedIds.length > 0) {
+      await model.update(
+        { billingPaymentId: 0 }, // 0 means processed but not billable
+        { where: { id: { [Op.in]: skippedIds } } }
+      );
+    }
 
     return true;
   } catch (err) {
@@ -546,27 +564,59 @@ const worker = new Worker(
     });
 
     if (unbilledTasksForDate.length > 0) {
-      const ok = await chargeAutomationBatchForDate({
-        user,
-        event,
-        type,
-        tasksForDate: unbilledTasksForDate,
-        model: Model,
-        dateKey,
-      });
+      const now = new Date();
+      const unbilledIds = unbilledTasksForDate.map((t) => t.id);
 
-      if (!ok) {
-        console.error(
-          `Billing failed for ${type} tasks event ${event.id} on ${dateKey}`
-        );
-        task.status = "failed";
-        await task.save();
-        return;
-      }
-
-      console.log(
-        `Charged successfully for ${unbilledTasksForDate.length} ${type} tasks of event ${event.id} on ${dateKey}`
+      // ATOMIC CLAIM: Try to mark all as "claimed" for billing
+      const [affectedCount] = await Model.update(
+        { billingClaimedAt: now },
+        {
+          where: {
+            id: { [Op.in]: unbilledIds },
+            billingClaimedAt: { [Op.is]: null },
+            billingPaymentId: { [Op.is]: null },
+          },
+        }
       );
+
+      if (affectedCount > 0) {
+        // This worker won the race for at least some tasks in this batch.
+        // Re-load only the tasks that we actually claimed.
+        const claimedTasks = await Model.findAll({
+          where: { id: { [Op.in]: unbilledIds }, billingClaimedAt: now },
+        });
+
+        if (claimedTasks.length > 0) {
+          const ok = await chargeAutomationBatchForDate({
+            user,
+            event,
+            type,
+            tasksForDate: claimedTasks,
+            model: Model,
+            dateKey,
+          });
+
+          if (!ok) {
+            console.error(
+              `Billing failed for ${type} tasks event ${event.id} on ${dateKey}. Resetting batch.`
+            );
+            // Reset to null so it can be retried
+            await Model.update(
+              { billingClaimedAt: null },
+              { where: { id: { [Op.in]: claimedTasks.map((t) => t.id) } } }
+            );
+            task.status = "failed";
+            await task.save();
+            return;
+          }
+
+          console.log(
+            `Processed billing for batch of ${claimedTasks.length} ${type} (event ${event.id}) on ${dateKey}`
+          );
+        }
+      } else {
+        console.log(`Batch for ${type} on ${dateKey} already being processed or finished by another worker.`);
+      }
     }
 
     // 2) SKIP CONFIRMED GUESTS (same as old automaticPause behavior)
@@ -641,6 +691,7 @@ const worker = new Worker(
             task.senderName
           );
           task.status = "success";
+          task.isTriggered = true;
           await task.save();
 
           console.log(`SMS sent to ${task.guestNumber}`);
@@ -678,6 +729,7 @@ const worker = new Worker(
           //   task.rsvpToken
           // );
           task.status = "success";
+          task.isTriggered = true;
           await task.save();
           console.log(`WhatsApp sent to ${task.guestNumber}`);
           break;
@@ -735,6 +787,7 @@ const worker = new Worker(
             console.log("AI call API response:", data);
 
             task.status = "success";
+            task.isTriggered = true; // NEW
             await task.save();
           } catch (err) {
             console.error(`AI call API failed for ${task.guestNumber}:`, err);
@@ -747,6 +800,7 @@ const worker = new Worker(
 
         case "HUMAN_CALL":
           task.status = "success";
+          task.isTriggered = true;
           await task.save();
           console.log(`Human call triggered for ${task.guestNumber}`);
           break;
@@ -796,6 +850,7 @@ const worker = new Worker(
             task.senderName
           );
           task.status = "success";
+          task.isTriggered = true;
           await task.save();
           break;
         }
@@ -840,6 +895,7 @@ const worker = new Worker(
             task.rsvpToken
           );
           task.status = "success";
+          task.isTriggered = true;
           await task.save();
           break;
         }

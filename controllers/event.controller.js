@@ -722,13 +722,13 @@ const updateAutomationSettings = async (req, res) => {
     const futureRows =
       futureSteps.length > 0
         ? futureSteps.map((s) => ({
-            eventId,
-            baseType: normalizeBaseType(s.baseType),
-            executionDate: s.runDate,
-            stepOrder: s.order ?? 1,
-            rounds: s.rounds || 1,
-            name: s.name || null,
-          }))
+          eventId,
+          baseType: normalizeBaseType(s.baseType),
+          executionDate: s.runDate,
+          stepOrder: s.order ?? 1,
+          rounds: s.rounds || 1,
+          name: s.name || null,
+        }))
         : [];
 
     if (futureRows.length > 0) {
@@ -741,17 +741,17 @@ const updateAutomationSettings = async (req, res) => {
     const todayRows =
       todaySteps.length > 0
         ? await Promise.all(
-            todaySteps.map((s) =>
-              EventSetting.create({
-                eventId,
-                baseType: normalizeBaseType(s.baseType),
-                executionDate: s.runDate, // todayKey
-                stepOrder: s.order ?? 1,
-                rounds: s.rounds || 1,
-                name: s.name || null,
-              })
-            )
+          todaySteps.map((s) =>
+            EventSetting.create({
+              eventId,
+              baseType: normalizeBaseType(s.baseType),
+              executionDate: s.runDate, // todayKey
+              stepOrder: s.order ?? 1,
+              rounds: s.rounds || 1,
+              name: s.name || null,
+            })
           )
+        )
         : [];
 
     // ✅ 3) delete FUTURE pending automation tasks, keep today's tasks as-is
@@ -1051,16 +1051,16 @@ const getEventAutomationStats = async (req, res) => {
       setupFeeAmount,
     ] = await Promise.all([
       SMSAutomation.count({
-        where: { eventId, status: "success" },
+        where: { eventId, status: "success", isTriggered: true },
       }),
       WhatsAppAutomation.count({
-        where: { eventId, status: "success" },
+        where: { eventId, status: "success", isTriggered: true },
       }),
       AICallAutomation.count({
-        where: { eventId, status: "success" },
+        where: { eventId, status: "success", isTriggered: true },
       }),
       HumanCallAutomation.count({
-        where: { eventId, status: "success" },
+        where: { eventId, status: "success", isTriggered: true },
       }),
 
       // Sum of actual charges from Payment table

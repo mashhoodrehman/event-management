@@ -34,6 +34,14 @@ const AICallAutomation = sequelize.define("AICallAutomation", {
     type: DataTypes.INTEGER,
     allowNull: true,
   },
+  isTriggered: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+  },
+  billingClaimedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
 module.exports = AICallAutomation;

@@ -289,9 +289,71 @@ const getRecentActivity = async (req, res) => {
       // updatedAt: guest.updatedAt,
     }));
 
+    // Get last automation run (SMS, WhatsApp, AI Call, or Human Call)
+    const [
+      latestSMS,
+      latestWhatsApp,
+      latestAICall,
+      latestHumanCall,
+    ] = await Promise.all([
+      SMSAutomation.findAll({
+        where: { eventId, status: "success" },
+        order: [["updatedAt", "DESC"]],
+        limit: 100,
+      }),
+      WhatsAppAutomation.findAll({
+        where: { eventId, status: "success" },
+        order: [["updatedAt", "DESC"]],
+        limit: 100,
+      }),
+      AICallAutomation.findAll({
+        where: { eventId, status: "success" },
+        order: [["updatedAt", "DESC"]],
+        limit: 100,
+      }),
+      HumanCallAutomation.findAll({
+        where: { eventId, status: "success" },
+        order: [["updatedAt", "DESC"]],
+        limit: 100,
+      }),
+    ]);
+
+    // Find the most recent automation run
+    let lastAutomationRun = null;
+
+    const allAutomations = [
+      ...latestSMS.map((a) => ({ ...a.dataValues, type: "SMS" })),
+      ...latestWhatsApp.map((a) => ({ ...a.dataValues, type: "WhatsApp" })),
+      ...latestAICall.map((a) => ({ ...a.dataValues, type: "AI Call" })),
+      ...latestHumanCall.map((a) => ({ ...a.dataValues, type: "Human Call" })),
+    ];
+
+    if (allAutomations.length > 0) {
+      // Sort by scheduledAt to get the most recent automation batch
+      allAutomations.sort((a, b) => new Date(b.scheduledAt) - new Date(a.scheduledAt));
+      const mostRecent = allAutomations[0];
+
+      // Count how many of the same type were scheduled in the same batch (same scheduledAt time)
+
+      const count = allAutomations.filter(
+        (a) =>
+          a.type === mostRecent.type &&
+          a.isTriggered &&
+          Math.abs(new Date(a.scheduledAt).getTime() - new Date(mostRecent.scheduledAt).getTime()) < 30 * 60 * 1000
+      ).length;
+
+      lastAutomationRun = {
+        type: mostRecent.type,
+        message: `We sent ${count} ${mostRecent.type.toLowerCase()} ${count === 1 ? "message" : "messages"}`,
+        timeAgo: formatTimeAgo(mostRecent.scheduledAt),
+        scheduledAt: mostRecent.scheduledAt,
+      };
+    }
+
     return res.status(200).json({
       success: true,
       data: activities,
+      lastAutomationRun,
     });
   } catch (error) {
     console.error("Error fetching recent activity:", error);
