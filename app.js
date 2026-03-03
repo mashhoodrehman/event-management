@@ -3,11 +3,11 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const cors = require("cors");
 const sequelize = require("./config/database");
+const cardcomRoutes = require("./routes/cardcom.routes");
 const authRoutes = require("./routes/auth.routes");
 const seedEventTypes = require("./seed/eventTypeSeeder");
 const eventTypeRoutes = require("./routes/eventTypes.routes");
 const eventRoutes = require("./routes/event.routes");
-const stripeRoutes = require("./routes/stripe.routes");
 const guestRoutes = require("./routes/guest.routes");
 const automationRoutes = require("./routes/automation.routes");
 const reminderRoutes = require("./routes/reminder.routes");
@@ -58,7 +58,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Routes
-app.use("/api/stripe", stripeRoutes);
+app.use("/api/cardcom", cardcomRoutes);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/event-types", eventTypeRoutes);
@@ -77,13 +77,14 @@ app.use("/api/webhooks", aiCallWebhookRoutes);
 app.use("/api/event", eventHumanCallsRoutes);
 
 require("./workers/automationWorker");
+require("./workers/emailWorker");
 
 // require("./cron/automationRunner");
 
 // Database Sync
 sequelize
   .sync()
-  .then(async ({}) => {
+  .then(async ({ }) => {
     console.log("✅ MySQL Database Connected & Synced");
 
     // Run seeder (only if needed)

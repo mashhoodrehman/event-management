@@ -20,6 +20,7 @@ const {
 const {
   processSetupFee,
   getPaymentsByEvent,
+  checkSetupFee,
 } = require("../controllers/payment.controller");
 const authMiddleware = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
@@ -47,6 +48,7 @@ router.post("/message-template", authMiddleware, saveMessageTemplate);
 // router.post("/automation-schedule", authMiddleware, saveEventSchedule);
 router.post("/setup-fee", authMiddleware, processSetupFee);
 router.get("/payments", authMiddleware, getPaymentsByEvent);
+router.get("/check-setup-fee", authMiddleware, checkSetupFee);
 router.get("/list", authMiddleware, getUserEvents);
 router.get("/details/:eventId", authMiddleware, getEventDetails);
 router.get("/stats/:eventId", authMiddleware, getEventAutomationStats);

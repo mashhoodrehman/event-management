@@ -2,7 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/user.model");
-const transporter = require("../config/email");
+const { enqueueEmailJob } = require("../queues/emailQueue");
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
@@ -33,7 +33,7 @@ const signup = async (req) => {
     email,
     password: hashedPassword,
     type, // 👈 added type
-    timezone : userTimezone,
+    timezone: userTimezone,
     verificationToken,
   });
 
@@ -46,7 +46,7 @@ const signup = async (req) => {
     .replace(/{{verificationLink}}/g, verificationLink)
     .replace(/{{year}}/g, new Date().getFullYear());
 
-  await transporter.sendMail({
+  await enqueueEmailJob({
     from: process.env.EMAIL_USER,
     to: email,
     subject: "Verify your account",
@@ -113,7 +113,7 @@ const verifyAccount = async (token, res) => {
     /{{userName}}/g,
     user.name
   );
-  
+
   return successHtml;
 };
 
@@ -129,44 +129,44 @@ const getProfile = async (userId) => {
 const forgotPassword = async (email) => {
   const user = await User.findOne({ where: { email } });
 
-  if (!user) { 
-    return { message: "User not found" }; 
+  if (!user) {
+    return { message: "User not found" };
   }
 
   const token = crypto.randomBytes(32).toString("hex");
   user.verificationToken = token;
-  user.updatedAt = new Date(); 
+  user.updatedAt = new Date();
   await user.save();
 
   const resetLink = `https://aridar-cms.revuity.com/reset-password/${token}`;
-  await sendResetEmail(email, resetLink); 
+  await sendResetEmail(email, resetLink);
   return {
     message: "Password reset link sent",
   }
 };
 
-  async function sendResetEmail(email, link) {
-    await transporter.sendMail({ 
-      to: email, 
-      subject: 'Reset your password', 
-      html: `<p>Click <a href="${link}">${link}</a> to reset your password.</p>` 
-    }); 
+async function sendResetEmail(email, link) {
+  await enqueueEmailJob({
+    to: email,
+    subject: 'Reset your password',
+    html: `<p>Click <a href="${link}">${link}</a> to reset your password.</p>`
+  });
+}
+
+const resetPassword = async (token, password) => {
+  const user = await User.findOne({ where: { verificationToken: token } });
+  if (!user) {
+    return { message: "Invalid or expired token" }
   }
 
-  const resetPassword = async (token, password) => {
-    const user = await User.findOne({ where: { verificationToken: token } }); 
-    if (!user) { 
-      return { message: "Invalid or expired token"  }
-    }
+  const hashedPassword = await bcrypt.hash(password, 10);
+  user.password = hashedPassword;
+  user.verificationToken = null;
+  user.updatedAt = new Date();
+  await user.save();
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    user.password = hashedPassword; 
-    user.verificationToken = null; 
-    user.updatedAt = new Date();
-    await user.save();
-
-    return { message: "Password reset successful" };
-  }
+  return { message: "Password reset successful" };
+}
 
 module.exports = {
   signup,
