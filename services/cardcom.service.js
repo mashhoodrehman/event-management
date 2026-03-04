@@ -10,6 +10,7 @@ class CardcomService {
         this.apiName = process.env.CARDCOM_USER_NAME || "rv9lS4Io85c3xdb2CmHZ"; // In v11 it's ApiName
         this.apiPassword = process.env.CARDCOM_API_PASSWORD || "wACiMRwEclrq8w4NK3O9";
         this.lowProfileUrl = "https://secure.cardcom.solutions/api/v11/LowProfile/Create";
+        this.transactionUrl = "https://secure.cardcom.solutions/api/v11/Transactions/Transaction";
         this.directRequestUrl = "https://secure.cardcom.solutions/Interface/DirectRequest.aspx";
     }
 
@@ -55,32 +56,41 @@ class CardcomService {
      * @param {Object} params { amount, token, eventId, description }
      * @returns {Promise<Object>} Transaction result
      */
-    async chargeToken({ amount, token, eventId, description }) {
-        const qs = require("qs");
-        const data = {
-            TerminalNumber: this.terminalNumber,
-            ApiUserName: this.apiName, // DirectRequest might still use ApiUserName
+    async chargeToken({ amount, token, eventId, description, user }) {
+        // Format MMYY for v11 API
+        let expDate = "0000";
+        if (user && user.cardcomExpMonth && user.cardcomExpYear) {
+            const m = String(user.cardcomExpMonth).padStart(2, "0");
+            const y = String(user.cardcomExpYear).slice(-2);
+            expDate = m + y;
+        }
+
+        const payload = {
+            TerminalNumber: parseInt(this.terminalNumber),
+            ApiName: this.apiName,
             ApiPassword: this.apiPassword,
-            Operation: 1, // 1 = Charge
-            SumToBill: amount,
+            Operation: "Charge",
+            Amount: amount,
             CoinID: 1, // 1 for ILS
-            CardToken: token,
-            Description: description || `Charge for Event #${eventId}`,
+            Token: token,
+            CardExpirationMMYY: expDate,
         };
 
         try {
-            const response = await axios.post(this.directRequestUrl, qs.stringify(data));
-            const result = qs.parse(response.data);
+            const response = await axios.post(this.directRequestUrl, payload, {
+                headers: { "Content-Type": "application/json" }
+            });
+            const result = response.data;
 
             return {
-                success: result.ResponseCode === "0",
+                success: result.ResponseCode === 0,
                 transactionId: result.InternalID,
                 errorCode: result.ResponseCode,
-                errorDescription: result.Description,
+                errorDescription: result.Description || result.message || "Unknown Cardcom Error",
                 raw: result,
             };
         } catch (error) {
-            console.error("Cardcom chargeToken error:", error.message);
+            console.error("Cardcom chargeToken error:", error.response?.data || error.message);
             throw error;
         }
     }

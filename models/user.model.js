@@ -44,6 +44,14 @@ const User = sequelize.define("User", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+  cardcomExpMonth: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  cardcomExpYear: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
   timezone: {
     type: DataTypes.STRING,
     allowNull: true,

@@ -318,6 +318,7 @@ async function chargeAutomationBatchForDate({
       token: user.cardcomToken,
       eventId: event.id,
       description: `${type} automation batch for event #${event.id} on date ${dateKey}`,
+      user, // ✅ Pass user for expiration MMYY
     });
 
     const payment = await Payment.create({
@@ -342,7 +343,8 @@ async function chargeAutomationBatchForDate({
       type,
       quantity: tasksToCharge.length,
       unitPriceAgorot: pricePerUnit,
-      totalAgorot: amountCents,
+      //  totalAgorot: amountCents,
+      totalAgorot: amountAgorot,
       payment,
       dateKey,
     });

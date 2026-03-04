@@ -172,6 +172,7 @@ async function chargeAutomationBatch(user, event, type, tasksToBill, model) {
       token: user.cardcomToken,
       eventId: event.id,
       description: `${type} automation batch for event #${event.id}`,
+      user, // ✅ Pass user for expiration MMYY
     });
 
     const payment = await Payment.create({
@@ -197,7 +198,8 @@ async function chargeAutomationBatch(user, event, type, tasksToBill, model) {
       type,
       quantity: tasksToBill.length,
       unitPriceAgorot: pricePerUnit,
-      totalAgorot: amountCents,
+      //  totalAgorot: amountCents,
+      totalAgorot: amountAgorot,
       payment,
     });
 

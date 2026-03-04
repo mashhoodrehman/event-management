@@ -24,6 +24,8 @@ const cardcomWebhook = async (req, res) => {
         const CardLast4 = data.TranzactionInfo?.Last4CardDigitsString || data.TranzactionInfo?.Last4CardDigits || data.CardLast4;
         const ReturnValue = data.ReturnValue;
         const SumToBill = data.TranzactionInfo?.Amount || data.SumToBill;
+        const CardMonth = data.TokenInfo?.CardMonth || data.TranzactionInfo?.CardMonth || data.CardMonth;
+        const CardYear = data.TokenInfo?.CardYear || data.TranzactionInfo?.CardYear || data.CardYear;
 
         if (String(ResponseCode) !== "0") {
             console.warn("Cardcom transaction failed reported by webhook:", data);
@@ -85,6 +87,8 @@ const cardcomWebhook = async (req, res) => {
             if (user) {
                 user.cardcomToken = CardToken;
                 user.cardcomLast4 = CardLast4;
+                if (CardMonth) user.cardcomExpMonth = String(CardMonth);
+                if (CardYear) user.cardcomExpYear = String(CardYear);
                 await user.save();
                 console.log(`Saved Cardcom Token for User ${userId}`);
             }
