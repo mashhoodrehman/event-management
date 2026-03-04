@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const { Op } = require("sequelize");
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const cardcomService = require("../services/cardcom.service");
 
 const fs = require("fs");
 const path = require("path");
@@ -154,69 +155,37 @@ async function chargeAutomationBatch(user, event, type, tasksToBill, model) {
       return true; // treat as free
     }
 
-    if (!user || !user.stripeCustomerId) {
+    if (!user || !user.cardcomToken) {
       console.error(
-        `Cannot charge automation batch: missing Stripe customer for user ${user?.id}`
+        `Cannot charge automation batch: missing Cardcom token for user ${user?.id}`
       );
       return false;
     }
 
-    const amountCents = pricePerUnit * tasksToBill.length;
-    if (amountCents <= 0) return true;
+    const amountAgorot = pricePerUnit * tasksToBill.length;
+    if (amountAgorot <= 0) return true;
 
-    // Get saved card
-    const pms = await stripe.paymentMethods.list({
-      customer: user.stripeCustomerId,
-      type: "card",
-      limit: 1,
-    });
-
-    if (!pms.data || pms.data.length === 0) {
-      console.error(
-        `No payment method found for customer ${user.stripeCustomerId}`
-      );
-      return false;
-    }
-
-    const paymentMethod = pms.data[0];
     const automationPaymentType = mapAutomationTypeToPaymentType(type);
 
-    const pi = await stripe.paymentIntents.create({
-      amount: amountCents,
-      currency: "ils",
-      customer: user.stripeCustomerId,
-      payment_method: paymentMethod.id,
-      off_session: true,
-      confirm: true,
+    const result = await cardcomService.chargeToken({
+      amount: amountAgorot / 100, // Cardcom takes ILS
+      token: user.cardcomToken,
+      eventId: event.id,
       description: `${type} automation batch for event #${event.id}`,
-      metadata: {
-        eventId: String(event.id),
-        paymentType: automationPaymentType,
-        automationType: type,
-        batchSize: String(tasksToBill.length),
-      },
     });
-
-    const statusMap = {
-      succeeded: "succeeded",
-      requires_action: "requires_action",
-      processing: "initiated",
-      requires_payment_method: "failed",
-    };
-    const paymentStatus = statusMap[pi.status] || "initiated";
 
     const payment = await Payment.create({
       eventId: event.id,
-      amount: amountCents,
+      amount: amountAgorot,
       currency: "ils",
-      paymentIntentId: pi.id,
+      paymentIntentId: result.transactionId || "N/A",
       type: automationPaymentType,
-      status: paymentStatus,
+      status: result.success ? "succeeded" : "failed",
     });
 
-    if (pi.status !== "succeeded") {
+    if (!result.success) {
       console.error(
-        `Automation charge for ${type} event ${event.id} not succeeded: ${pi.status}`
+        `Automation charge for ${type} event ${event.id} failed: ${result.errorDescription}`
       );
       return false;
     }

@@ -3,8 +3,7 @@ const { Op } = require("sequelize");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const Guest = require("../models/guest.model");
 const Event = require("../models/event.model");
-const Stripe = require("stripe");
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const cardcomService = require("../services/cardcom.service");
 
 const Payment = require("../models/payment.model");
 const User = require("../models/user.model");
@@ -80,22 +79,22 @@ exports.getHumanCalls = async (req, res) => {
 
           guest: g
             ? {
-                id: g.id,
-                name: g.name,
-                phone: g.phone,
-                status: g.status,
-                peopleCount: g.peopleCount,
-                rsvpToken: g.rsvpToken,
-              }
+              id: g.id,
+              name: g.name,
+              phone: g.phone,
+              status: g.status,
+              peopleCount: g.peopleCount,
+              rsvpToken: g.rsvpToken,
+            }
             : null,
 
           event: g?.Event
             ? {
-                id: g.Event.id,
-                name: g.Event.name,
-                eventDate: g.Event.eventDate,
-                location: g.Event.location,
-              }
+              id: g.Event.id,
+              name: g.Event.name,
+              eventDate: g.Event.eventDate,
+              location: g.Event.location,
+            }
             : null,
         };
       })
@@ -131,50 +130,26 @@ async function chargeHumanCallFee({ event, user, humanCallTaskId }) {
     10
   );
 
-  if (!user?.stripeCustomerId) throw new Error("User missing stripeCustomerId");
+  if (!user?.cardcomToken) throw new Error("User missing cardcomToken");
 
-  // pick default card
-  const pms = await stripe.paymentMethods.list({
-    customer: user.stripeCustomerId,
-    type: "card",
-    limit: 1,
-  });
-  if (!pms.data?.length) throw new Error("No saved card");
-
-  const pi = await stripe.paymentIntents.create({
-    amount: HUMAN_CALL_PRICE,
-    currency: "ils",
-    customer: user.stripeCustomerId,
-    payment_method: pms.data[0].id,
-    off_session: true,
-    confirm: true,
+  const result = await cardcomService.chargeToken({
+    amount: HUMAN_CALL_PRICE / 100, // Cardcom takes ILS
+    token: user.cardcomToken,
+    eventId: event.id,
     description: `Human call fee for event #${event.id}`,
-    metadata: {
-      eventId: String(event.id),
-      paymentType: "human_call_fee",
-      taskId: String(humanCallTaskId),
-    },
   });
-
-  const statusMap = {
-    succeeded: "succeeded",
-    requires_action: "requires_action",
-    processing: "initiated",
-    requires_payment_method: "failed",
-  };
-  const paymentStatus = statusMap[pi.status] || "initiated";
 
   const payment = await Payment.create({
     eventId: event.id,
     amount: HUMAN_CALL_PRICE,
     currency: "ils",
-    paymentIntentId: pi.id,
+    paymentIntentId: result.transactionId || "N/A",
     type: "human_call_fee",
-    status: paymentStatus,
+    status: result.success ? "succeeded" : "failed",
   });
 
-  if (pi.status !== "succeeded") {
-    throw new Error(`Payment not succeeded: ${pi.status}`);
+  if (!result.success) {
+    throw new Error(`Payment failed: ${result.errorDescription}`);
   }
 
   return payment;

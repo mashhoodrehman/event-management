@@ -217,6 +217,11 @@ const getGuestsByFilters = async (req, res) => {
     const { eventId, status } = req.query;
     const userId = req.user.id; // From auth middleware
 
+    // Pagination
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
+    const offset = (page - 1) * limit;
+
     if (!eventId) return res.status(400).json({ error: "eventId is required" });
 
     // Verify event belongs to user
@@ -236,15 +241,22 @@ const getGuestsByFilters = async (req, res) => {
       whereCondition.status = { [Op.in]: statusArray };
     }
 
-    // Fetch guests
-    const guests = await Guest.findAll({
+    // Fetch guests with pagination
+    const { count, rows: guests } = await Guest.findAndCountAll({
       where: whereCondition,
       order: [["id", "DESC"]],
+      limit,
+      offset,
     });
+
+    const totalPages = Math.ceil(count / limit);
 
     return res.status(200).json({
       success: true,
-      total: guests.length,
+      total: count,
+      page,
+      limit,
+      totalPages,
       data: guests,
     });
   } catch (error) {
@@ -593,6 +605,155 @@ const getPendingFollowupGuests = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/guest/confirmed-with-history
+ * Returns confirmed + hesitate guests for an event,
+ * each with the full list of communication attempts across all channels.
+ * Also returns a summary of total people count (peopleCount sum).
+ */
+const getConfirmedGuestsWithHistory = async (req, res) => {
+  try {
+    const { eventId } = req.query;
+    const userId = req.user.id;
+
+    // Pagination
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    if (!eventId) return res.status(400).json({ error: "eventId is required" });
+
+    const event = await Event.findOne({ where: { id: eventId, userId } });
+    if (!event) return res.status(404).json({ error: "Event not found or unauthorized" });
+
+    // 1) Fetch confirmed + hesitate guests (paginated)
+    const { count, rows: guests } = await Guest.findAndCountAll({
+      where: { eventId, status: { [Op.in]: ["confirmed", "hesitate"] } },
+      order: [["updatedAt", "DESC"]],
+      limit,
+      offset,
+    });
+
+    if (!guests.length) {
+      return res.json({
+        success: true,
+        total: count,
+        page, limit,
+        totalPages: Math.ceil(count / limit),
+        totalPeopleCount: 0,
+        data: [],
+      });
+    }
+
+    // Total people count across ALL confirmed guests (not just this page)
+    const allConfirmed = await Guest.findAll({
+      where: { eventId, status: { [Op.in]: ["confirmed", "hesitate"] } },
+      attributes: ["peopleCount"],
+    });
+    const totalPeopleCount = allConfirmed.reduce((sum, g) => sum + (g.peopleCount || 1), 0);
+
+    const tokens = guests.map((g) => g.rsvpToken).filter(Boolean);
+
+    // 2) Load all automation tasks for these guests
+    const [smsTasks, whatsappTasks, aiTasks, humanTasks] = await Promise.all([
+      SMSAutomation.findAll({
+        where: { eventId, rsvpToken: { [Op.in]: tokens } },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status", "round"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+      WhatsAppAutomation.findAll({
+        where: { eventId, rsvpToken: { [Op.in]: tokens } },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status", "round"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+      AICallAutomation.findAll({
+        where: { eventId, rsvpToken: { [Op.in]: tokens } },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status", "round"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+      HumanCallAutomation.findAll({
+        where: { eventId, rsvpToken: { [Op.in]: tokens } },
+        attributes: ["id", "rsvpToken", "scheduledAt", "status", "round", "callResult", "agentNote"],
+        order: [["scheduledAt", "ASC"]],
+      }),
+    ]);
+
+    // 3) Build token → attempts map
+    const attemptsByToken = new Map();
+    guests.forEach((g) => attemptsByToken.set(g.rsvpToken, []));
+
+    const pushAttempt = (task, channel) => {
+      const arr = attemptsByToken.get(task.rsvpToken);
+      if (!arr) return;
+      arr.push({
+        id: task.id,
+        channel,
+        scheduledAt: task.scheduledAt,
+        status: task.status,   // pending | success | failed
+        round: task.round || 1,
+        // human-call extras
+        callResult: task.callResult || null,
+        agentNote: task.agentNote || null,
+      });
+    };
+
+    smsTasks.forEach((t) => pushAttempt(t, "sms"));
+    whatsappTasks.forEach((t) => pushAttempt(t, "whatsapp"));
+    aiTasks.forEach((t) => pushAttempt(t, "ai_call"));
+    humanTasks.forEach((t) => pushAttempt(t, "human_call"));
+
+    // 4) Find which channel the guest actually responded on (latest success before status changed)
+    const responseChannelByToken = new Map();
+    guests.forEach((g) => {
+      const attempts = attemptsByToken.get(g.rsvpToken) || [];
+      // Sort by scheduled time
+      attempts.sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
+
+      // The channel that got a "success" status is where the guest responded
+      const respondedAttempt = [...attempts].reverse().find((a) => a.status === "success");
+      responseChannelByToken.set(
+        g.rsvpToken,
+        respondedAttempt ? respondedAttempt.channel : null
+      );
+    });
+
+    // 5) Build final response
+    const data = guests.map((g) => {
+      const attempts = (attemptsByToken.get(g.rsvpToken) || []).sort(
+        (a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime()
+      );
+
+      // Channels used (unique, ordered)
+      const channelsUsed = [...new Set(attempts.map((a) => a.channel))];
+
+      return {
+        id: g.id,
+        name: g.name,
+        phone: g.phone,
+        status: g.status,
+        peopleCount: g.peopleCount || 1,
+        updatedAt: g.updatedAt,
+        responseChannel: responseChannelByToken.get(g.rsvpToken),  // channel where guest replied
+        channelsUsed,                                               // all channels contacted
+        communicationHistory: attempts,                             // full timeline
+      };
+    });
+
+    return res.json({
+      success: true,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+      totalPeopleCount,
+      data,
+    });
+  } catch (err) {
+    console.error("getConfirmedGuestsWithHistory error:", err);
+    res.status(500).json({ error: err.message || "Server error" });
+  }
+};
+
 module.exports = {
   updateRSVPStatus,
   getGuestDetails,
@@ -602,4 +763,5 @@ module.exports = {
   getPendingFollowupGuests,
   addGuestManual,
   getWeeklyActivity,
+  getConfirmedGuestsWithHistory,
 };

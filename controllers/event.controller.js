@@ -5,8 +5,6 @@ const Guest = require("../models/guest.model");
 const EventSetting = require("../models/eventSetting.model");
 const MessageTemplate = require("../models/messageTemplate.model");
 const EventAutomationSchedule = require("../models/eventAutomationSchedule.model");
-const Stripe = require("stripe");
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const Payment = require("../models/payment.model");
 const SMSAutomation = require("../models/smsAutomation.model");
 const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
@@ -1292,6 +1290,53 @@ const getEventAutomationSteps = async (req, res) => {
   }
 };
 
+/**
+ * PATCH /api/event/invitation/:eventId
+ * Replaces or removes the invitation file for an existing event.
+ * Send multipart/form-data with field `invitationFile` to upload a new file.
+ * Send JSON body { remove: true } (no file) to clear the invitation.
+ */
+const fs = require("fs");
+const path = require("path");
+
+const updateInvitation = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { eventId } = req.params;
+    const remove = req.body?.remove === "true" || req.body?.remove === true;
+
+    const event = await Event.findOne({ where: { id: eventId, userId } });
+    if (!event) return res.status(404).json({ error: "Event not found or unauthorized" });
+
+    const oldFile = event.invitationFile;
+    const deleteOld = () => {
+      if (!oldFile) return;
+      const oldPath = path.join(__dirname, "..", "uploads", "invitations", oldFile);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    };
+
+    if (remove) {
+      // Clear invitation
+      deleteOld();
+      await event.update({ invitationFile: null });
+      return res.json({ success: true, invitationFile: null });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Replace old file
+    deleteOld();
+    await event.update({ invitationFile: req.file.filename });
+
+    return res.json({ success: true, invitationFile: req.file.filename });
+  } catch (err) {
+    console.error("updateInvitation error:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
 module.exports = {
   createOrUpdateEvent,
   addOrUpdateGuests,
@@ -1303,6 +1348,7 @@ module.exports = {
   getChannelResponseRates,
   getEventAutomationSteps,
   updateAutomationSettings,
+  updateInvitation,
 };
 
 // const Event = require("../models/event.model");

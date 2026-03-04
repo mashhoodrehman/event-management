@@ -35,12 +35,12 @@ const User = sequelize.define("User", {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  // 🔹 Stripe fields for saved card billing
-  stripeCustomerId: {
+  // 🔹 Cardcom fields for saved card billing
+  cardcomToken: {
     type: DataTypes.STRING,
     allowNull: true,
   },
-  defaultPaymentMethodId: {
+  cardcomLast4: {
     type: DataTypes.STRING,
     allowNull: true,
   },
