@@ -8,18 +8,18 @@ const GREEN_API_URL =
 
 // 3 FREE whitelisted numbers
 const WHITELISTED_NUMBERS = [
-  "3061435349@c.us",  
-  "3234895958@c.us",  
-  "3427306848@c.us"   
+  "3061435349@c.us",
+  "3234895958@c.us",
+  "3427306848@c.us"
 ];
 
 function phoneToWhatsAppId(phoneNumber) {
   // Remove all non-digits and leading +
   let cleaned = phoneNumber.replace(/\D/g, '');
-  
+
   // Remove leading + or 00
   if (cleaned.startsWith('00')) cleaned = cleaned.substring(2);
-  
+
   return `${cleaned}@c.us`;
 }
 
@@ -30,13 +30,17 @@ function isWhitelisted(chatId) {
 /**
  * Build PUBLIC RSVP link
  */
-function buildRsvpLink(rsvpToken) {
+function buildRsvpLink(rsvpToken, via = null) {
   const base =
     (process.env.FRONTEND_BASE_URL || "").trim() ||
     "https://yourdomain.com/rsvp";
 
   const baseUrl = base.replace(/\/+$/, "");
-  return `${baseUrl}?token=${encodeURIComponent(String(rsvpToken))}`;
+  let link = `${baseUrl}?token=${encodeURIComponent(String(rsvpToken))}`;
+  if (via) {
+    link += `&via=${via}`;
+  }
+  return link;
 }
 
 module.exports = {
@@ -64,7 +68,7 @@ module.exports = {
 
       // Convert phone to WhatsApp format
       const chatId = phoneToWhatsAppId(guestNumber);
-      
+
       // 🔥 CHECK IF WHITELISTED
       if (!isWhitelisted(chatId)) {
         console.warn(
@@ -74,10 +78,10 @@ module.exports = {
         console.log(`   - 3061435349`);
         console.log(`   - 3207622923`);
         console.log(`   - 923207622923`);
-        
+
         // ✅ Don't send, just return success (skip silently)
-        return { 
-          success: true, 
+        return {
+          success: true,
           skipped: true,
           reason: 'not_whitelisted',
           number: guestNumber
@@ -100,7 +104,7 @@ module.exports = {
    * Internal method to actually send the message
    */
   async _sendMessage(chatId, message, rsvpToken) {
-    const rsvpLink = buildRsvpLink(rsvpToken);
+    const rsvpLink = buildRsvpLink(rsvpToken, "whatsapp");
 
     const finalMessage = `${message}
 
@@ -120,8 +124,8 @@ ${rsvpLink}`;
 
     console.log("✅ Message sent successfully!");
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       data: response.data,
       recipient: chatId
     };

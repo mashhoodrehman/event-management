@@ -116,6 +116,12 @@ const updateRSVPStatus = async (req, res) => {
     // ✅ Update status
     guest.status = status;
 
+    // ✅ Track response source (via)
+    const via = req.body.via || req.query.via;
+    if (via) {
+      guest.respondedVia = via;
+    }
+
     // ✅ Update peopleCount ONLY when confirmed
     if (status === "confirmed") {
       const incoming = attendeesCount; // accept both
@@ -475,7 +481,7 @@ const getPendingFollowupGuests = async (req, res) => {
           [Op.in]: ["pending", "hesitate", "cancel"],
         },
       },
-      attributes: ["id", "name", "phone", "status", "rsvpToken"],
+      attributes: ["id", "name", "phone", "status", "rsvpToken", "respondedVia"],
       order: [["id", "ASC"]],
     });
 
@@ -732,6 +738,7 @@ const getConfirmedGuestsWithHistory = async (req, res) => {
         phone: g.phone,
         status: g.status,
         peopleCount: g.peopleCount || 1,
+        respondedVia: g.respondedVia,
         updatedAt: g.updatedAt,
         responseChannel: responseChannelByToken.get(g.rsvpToken),  // channel where guest replied
         channelsUsed,                                               // all channels contacted

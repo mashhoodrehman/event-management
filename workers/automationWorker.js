@@ -625,7 +625,7 @@ const worker = new Worker(
         case "SMS": {
           const baseUrl =
             process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
-          const rsvpLink = `${baseUrl}?token=${task.rsvpToken}`;
+          const rsvpLink = `${baseUrl}?token=${task.rsvpToken}&via=sms`;
 
           const eventName = event?.name || "";
           const eventDateObj = event?.eventDate || null;
@@ -664,7 +664,7 @@ const worker = new Worker(
         case "WhatsApp": {
           const baseUrl =
             process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
-          const rsvpLink = `${baseUrl}?token=${task.rsvpToken}`;
+          const rsvpLink = `${baseUrl}?token=${task.rsvpToken}&via=whatsapp`;
 
           const eventName = event?.name || "";
           const eventDateObj = event?.eventDate || null;

@@ -77,10 +77,14 @@ class CardcomService {
         };
 
         try {
-            const response = await axios.post(this.directRequestUrl, payload, {
+            const response = await axios.post(this.transactionUrl, payload, {
                 headers: { "Content-Type": "application/json" }
             });
             const result = response.data;
+
+            if (result.ResponseCode !== 0) {
+                console.error("Cardcom chargeToken error response:", result);
+            }
 
             return {
                 success: result.ResponseCode === 0,
