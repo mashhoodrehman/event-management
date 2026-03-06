@@ -258,6 +258,7 @@ async function chargeAutomationBatchForDate({
   tasksForDate,
   model,
   dateKey,
+  guestByToken,
 }) {
   try {
     const pricePerUnit = await getPriceForType(type);
@@ -557,6 +558,7 @@ const worker = new Worker(
             tasksForDate: claimedTasks,
             model: Model,
             dateKey,
+            guestByToken,
           });
 
           if (!ok) {
