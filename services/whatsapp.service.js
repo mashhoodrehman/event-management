@@ -143,5 +143,44 @@ ${rsvpLink}`;
       console.error("Failed to get account status:", error.message);
       return null;
     }
+  },
+
+  async sendExternalWhatsApp(phoneNumber, message) {
+    try {
+      const EXTERNAL_API_URL = "https://invitenow-whatsapp-api.revuity.com/api/whatsapp/send";
+
+      const requestBody = {
+        contact: [
+          {
+            number: phoneNumber,
+            message: message,
+            sms_type: "plain"
+          }
+        ]
+      };
+
+      console.log("📨 Sending via External WhatsApp API to:", phoneNumber);
+
+      const response = await axios.post(EXTERNAL_API_URL, requestBody, {
+        headers: {
+          "Content-Type": "application/json",
+          "Api-key": process.env.EXTERNAL_WHATSAPP_API_KEY || "b52dcc52-4828-44c5-b0c7-54ef96d37d82"
+        },
+      });
+
+      console.log("✅ External API response:", response.data);
+
+      return {
+        success: true,
+        data: response.data,
+        recipient: phoneNumber
+      };
+    } catch (error) {
+      console.error(
+        "❌ External WhatsApp API Error:",
+        error.response?.data || error.message
+      );
+      throw error;
+    }
   }
 };

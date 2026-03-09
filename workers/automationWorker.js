@@ -693,6 +693,10 @@ const worker = new Worker(
           //   message,
           //   task.rsvpToken
           // );
+          await whatsappService.sendExternalWhatsApp(
+            task.guestNumber,
+            message
+          );
           task.status = "success";
           task.isTriggered = true;
           await task.save();
@@ -854,10 +858,10 @@ const worker = new Worker(
             .replace(/\{מקום\}/g, location)
             .replace(/\{link\}/gi, rsvpLink);
 
-          await whatsappService.sendWhatsAppTemplate(
+          await whatsappService.sendExternalWhatsApp(
             task.guestNumber,
             message,
-            task.rsvpToken
+            // task.rsvpToken
           );
           task.status = "success";
           task.isTriggered = true;
