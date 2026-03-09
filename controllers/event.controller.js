@@ -1253,16 +1253,69 @@ const getEventAutomationSteps = async (req, res) => {
     const now = new Date();
     const todayKey = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
 
-    const formatted = steps.map((s) => {
+    // helper map so we can look up the appropriate automation table by baseType
+    const modelMap = {
+      sms: SMSAutomation,
+      whatsapp: WhatsAppAutomation,
+      ai_call: AICallAutomation,
+      human_call: HumanCallAutomation,
+    };
+
+    // compute a more precise status for each step by examining actual tasks
+    const formattedPromises = steps.map(async (s) => {
       const dateKey =
         typeof s.executionDate === "string"
           ? s.executionDate
           : s.executionDate.toISOString().slice(0, 10);
 
-      let status;
-      if (dateKey < todayKey) status = "completed";
-      else if (dateKey === todayKey) status = "in_progress";
-      else status = "upcoming";
+      // default status based only on the calendar
+      let status =
+        dateKey < todayKey
+          ? "completed"
+          : dateKey === todayKey
+          ? "in_progress"
+          : "upcoming";
+
+      // if the step has passed or is today, try to read real task results
+      const Model = modelMap[s.baseType];
+      if (Model) {
+        const start = new Date(dateKey);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 1);
+
+        const tasks = await Model.findAll({
+          where: {
+            eventId,
+            scheduledAt: { [Op.gte]: start, [Op.lt]: end },
+          },
+          attributes: ["status"],
+        });
+
+        if (tasks.length > 0) {
+          const anyPending = tasks.some((t) => t.status === "pending");
+          const anySuccess = tasks.some((t) => t.status === "success");
+          const allFailed = tasks.every((t) => t.status === "failed");
+
+          if (anySuccess) {
+            status = "completed";
+          } else if (allFailed && !anyPending) {
+            status = "failed";
+          } else if (anyPending) {
+            // still in progress if there are pending jobs
+            status = dateKey === todayKey ? "in_progress" : "upcoming";
+          }
+        } else {
+          // there were no tasks scheduled for this step yet
+          if (dateKey > todayKey) {
+            status = "upcoming";
+          } else if (dateKey === todayKey) {
+            status = "in_progress";
+          } else {
+            // past date with no tasks → treat as failed so UI can show attention
+            status = "failed";
+          }
+        }
+      }
 
       const canEdit = status === "upcoming";
       const canDelete = status === "upcoming";
@@ -1274,11 +1327,13 @@ const getEventAutomationSteps = async (req, res) => {
         order: s.stepOrder,
         rounds: s.rounds,
         name: s.name,
-        status, // "completed" | "in_progress" | "upcoming"
+        status, // now "success", "failed", "in_progress" or "upcoming"
         canEdit,
         canDelete,
       };
     });
+
+    const formatted = await Promise.all(formattedPromises);
 
     return res.status(200).json({
       eventId: Number(eventId),
