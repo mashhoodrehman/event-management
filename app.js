@@ -75,6 +75,7 @@ app.use("/api/agent", agentAuthRoutes);
 
 app.use("/api/webhooks", aiCallWebhookRoutes);
 app.use("/api/event", eventHumanCallsRoutes);
+app.use("/api/whatsapp", require("./routes/whatsapp.routes"));
 
 require("./workers/automationWorker");
 require("./workers/emailWorker");
