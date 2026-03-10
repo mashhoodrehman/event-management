@@ -1,3 +1,5 @@
+const axios = require("axios");
+const { withRetry } = require("../utils/retry");
 const CardcomService = require("../services/cardcom.service");
 const Payment = require("../models/payment.model");
 const Event = require("../models/event.model");
@@ -15,8 +17,12 @@ const cardcomWebhook = async (req, res) => {
     try {
         // Cardcom sends data in query for GET or body for POST depending on setup.
         // Usually it's POST if IndicatorURL is called.
-        const data = req.body;
-        console.log("Cardcom Webhook Received:", data);
+        console.log("-------------------------------------------");
+        console.log("🔔 CARDCOM WEBHOOK TRIGGERED");
+        console.log("Body:", JSON.stringify(req.body, null, 2));
+        console.log("-------------------------------------------");
+
+        const data = { ...req.query, ...req.body }; // Handle both GET and POST data
 
         const ResponseCode = data.ResponseCode;
         const InternalID = data.TranzactionId || data.TranzactionInfo?.TranzactionId || data.InternalID;
@@ -107,6 +113,43 @@ const cardcomWebhook = async (req, res) => {
                 const settings = await EventSetting.findOne({ where: { eventId } });
 
                 if (settings) {
+                    // trigger Bot Config API after payment is confirmed
+                    try {
+                        const botConfigUrl = `https://invitenow-qr.revuity.com/bot/config?id=mmrtest`;
+                        const webhookUrl = "https://aridar-cms-api.revuity.com/api/whatsapp/status";
+
+                        const payload = {
+                            name: `rsvp-bot-${event.id}`,
+                            webhookUrl: webhookUrl,
+                            metaData: {
+                                eventId: event.id
+                            },
+                            autoReply: true,
+                            replyMessages: {
+                                attending: "תודה! נרשמת בהצלחה. ✅",
+                                not_attending: "חבל לפספס אותך! נתראה בשמחות. 😔",
+                                maybe: "הבנו, סימנו אותך כמתלבט. 🤔"
+                            }
+                        };
+
+                        console.log(`Triggering bot config for event ${event.id} after payment...`);
+
+                        await withRetry(async () => {
+                            const response = await axios.post(botConfigUrl, payload, {
+                                headers: {
+                                    "Content-Type": "application/json",
+                                },
+                                timeout: 30000,
+                            });
+                            console.log(`✅ Bot configured successfully for event ${event.id}`);
+                            return response;
+                        }).catch(err => {
+                            console.error(`❌ Bot config trigger failed for event ${event.id}:`, err.response?.data || err.message);
+                        });
+                    } catch (botErr) {
+                        console.error(`❌ Failed to initiated bot config for event ${event.id}:`, botErr.message);
+                    }
+
                     const template = await MessageTemplate.findOne({ where: { eventId } });
                     const templates = {
                         smsTemplateId: template?.id || null,

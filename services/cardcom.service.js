@@ -1,4 +1,5 @@
 const axios = require("axios");
+const { withRetry } = require("../utils/retry");
 
 /**
  * Cardcom Service to handle payments and tokenization
@@ -35,27 +36,18 @@ class CardcomService {
             WebHookUrl: indicatorUrl, // v11 uses WebHookUrl
         };
 
-        try {
-            const response = await axios.post(this.lowProfileUrl, payload, {
+        const response = await withRetry(async () => {
+            return await axios.post(this.lowProfileUrl, payload, {
                 headers: { "Content-Type": "application/json" },
-                timeout: 15000, // 15s — fail fast if Cardcom is unreachable
+                timeout: 30000, // 30s — longer timeout for slow network
             });
+        });
 
-            if (response.data.ResponseCode !== 0) {
-                throw new Error(`Cardcom Error: ${response.data.Description || "Unknown error"}`);
-            }
-
-            return response.data.Url;
-        } catch (error) {
-            const isTimeout = error.code === "ETIMEDOUT" || error.code === "ECONNABORTED";
-            console.error(
-                isTimeout
-                    ? "Cardcom createPaymentLink timed out — server unreachable"
-                    : "Cardcom createPaymentLink error:",
-                error.response?.data || error.message
-            );
-            throw error;
+        if (response.data.ResponseCode !== 0) {
+            throw new Error(`Cardcom Error: ${response.data.Description || "Unknown error"}`);
         }
+
+        return response.data.Url;
     }
 
     /**
@@ -84,10 +76,13 @@ class CardcomService {
         };
 
         try {
-            const response = await axios.post(this.transactionUrl, payload, {
-                headers: { "Content-Type": "application/json" },
-                timeout: 15000, // 15s — fail fast if Cardcom is unreachable
+            const response = await withRetry(async () => {
+                return await axios.post(this.transactionUrl, payload, {
+                    headers: { "Content-Type": "application/json" },
+                    timeout: 30000, // 30s — longer timeout for slow network
+                });
             });
+
             const result = response.data;
 
             if (result.ResponseCode !== 0) {
@@ -105,7 +100,7 @@ class CardcomService {
             const isTimeout = error.code === "ETIMEDOUT" || error.code === "ECONNABORTED";
             console.error(
                 isTimeout
-                    ? "Cardcom chargeToken timed out — server unreachable"
+                    ? "Cardcom chargeToken timed out — server unreachable after retries"
                     : "Cardcom chargeToken error:",
                 error.response?.data || error.message
             );

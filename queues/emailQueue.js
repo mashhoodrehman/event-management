@@ -16,7 +16,7 @@ async function enqueueEmailJob(emailOptions) {
         attempts: 3,
         backoff: {
             type: "exponential",
-            delay: 1000,
+            delay: 30000, // 30s initial delay
         },
         removeOnComplete: true,
         removeOnFail: false,

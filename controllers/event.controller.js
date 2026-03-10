@@ -135,38 +135,6 @@ const createOrUpdateEvent = async (req, res) => {
         invitationFile,
         status: "step1_completed",
       });
-
-      // trigger Bot Config API
-      try {
-        const botConfigUrl = `https://invitenow-qr.revuity.com/bot/config?id=${event.id}`;
-        const webhookUrl = "https://aridar-cms-api.revuity.com/api/whatsapp/status";
-
-        const payload = {
-          name: `rsvp-bot-${event.id}`,
-          webhookUrl: webhookUrl,
-          metaData: {
-            eventId: event.id
-          },
-          autoReply: true,
-          replyMessages: {
-            attending: "תודה! נרשמת בהצלחה. ✅",
-            not_attending: "חבל לפספס אותך! נתראה בשמחות. 😔",
-            maybe: "הבנו, סימנו אותך כמתלבט. 🤔"
-          }
-        };
-
-        console.log(`Triggering bot config for event ${event.id}...`);
-
-        axios.post(botConfigUrl, payload, {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }).catch(err => {
-          console.error(`❌ Bot config trigger failed for event ${event.id}:`, err.response?.data || err.message);
-        });
-      } catch (botErr) {
-        console.error(`❌ Failed to initiate bot config for event ${event.id}:`, botErr.message);
-      }
     }
 
     res.status(200).json({ message: "Step 1 completed", event });

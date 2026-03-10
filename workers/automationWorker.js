@@ -677,30 +677,17 @@ const worker = new Worker(
             formattedDate = new Date(eventDateObj).toLocaleDateString("he-IL");
           }
 
-          const message = await smsService.getMessageByTemplate(
-            task.templateId,
-            {
-              name: guest?.name || "",
-              eventName,
-              date: formattedDate,
-              location,
-              link: rsvpLink,
-            }
-          );
+          const message = `היי! האם אתם מגיעים לאירוע? \n\n1. כן, מגיעים\n2. לא, לא נוכל להגיע\n3. אולי`;
 
-          // await whatsappService.sendWhatsAppTemplate(
-          //   task.guestNumber,
-          //   message,
-          //   task.rsvpToken
-          // );
-          await whatsappService.sendExternalWhatsApp(
+          await whatsappService.sendBotMessage(
             task.guestNumber,
-            message
+            message,
+            event.id
           );
           task.status = "success";
           task.isTriggered = true;
           await task.save();
-          console.log(`WhatsApp sent to ${task.guestNumber}`);
+          console.log(`WhatsApp message sent to ${task.guestNumber}`);
           break;
         }
 
@@ -845,23 +832,27 @@ const worker = new Worker(
           );
           console.log(schedule, "mmmmmmmmmmmmrrrrr");
 
-          const rawTemplate = (schedule && schedule.messageText) || "";
+          // const rawTemplate = (schedule && schedule.messageText) || "";
 
-          const message = rawTemplate
-            .replace(/{{\s*first_name\s*}}/gi, guest?.name || "")
-            .replace(/\{name\}/gi, guest?.name || "")
-            .replace(/\{שם\}/g, guest?.name || "")
-            .replace(/\{eventName\}/gi, eventName)
-            .replace(/\{date\}/gi, formattedDate)
-            .replace(/\{תאריך\}/g, formattedDate)
-            .replace(/\{location\}/gi, location)
-            .replace(/\{מקום\}/g, location)
-            .replace(/\{link\}/gi, rsvpLink);
+          // const message = rawTemplate
+          //   .replace(/{{\s*first_name\s*}}/gi, guest?.name || "")
+          //   .replace(/\{name\}/gi, guest?.name || "")
+          //   .replace(/\{שם\}/g, guest?.name || "")
+          //   .replace(/\{eventName\}/gi, eventName)
+          //   .replace(/\{date\}/gi, formattedDate)
+          //   .replace(/\{תאריך\}/g, formattedDate)
+          //   .replace(/\{location\}/gi, location)
+          //   .replace(/\{מקום\}/g, location)
+          //   .replace(/\{link\}/gi, rsvpLink);
 
-          await whatsappService.sendExternalWhatsApp(
+          const guestName = guest?.name || "";
+
+          const message = `היי! האם אתם מגיעים לאירוע? \n\n1. כן, מגיעים\n2. לא, לא נוכל להגיע\n3. אולי`;
+
+          await whatsappService.sendBotMessage(
             task.guestNumber,
             message,
-            // task.rsvpToken
+            event.id
           );
           task.status = "success";
           task.isTriggered = true;
