@@ -37,7 +37,8 @@ class CardcomService {
 
         try {
             const response = await axios.post(this.lowProfileUrl, payload, {
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json" },
+                timeout: 15000, // 15s — fail fast if Cardcom is unreachable
             });
 
             if (response.data.ResponseCode !== 0) {
@@ -46,7 +47,13 @@ class CardcomService {
 
             return response.data.Url;
         } catch (error) {
-            console.error("Cardcom createPaymentLink error:", error.response?.data || error.message);
+            const isTimeout = error.code === "ETIMEDOUT" || error.code === "ECONNABORTED";
+            console.error(
+                isTimeout
+                    ? "Cardcom createPaymentLink timed out — server unreachable"
+                    : "Cardcom createPaymentLink error:",
+                error.response?.data || error.message
+            );
             throw error;
         }
     }
@@ -78,7 +85,8 @@ class CardcomService {
 
         try {
             const response = await axios.post(this.transactionUrl, payload, {
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json" },
+                timeout: 15000, // 15s — fail fast if Cardcom is unreachable
             });
             const result = response.data;
 
@@ -94,7 +102,13 @@ class CardcomService {
                 raw: result,
             };
         } catch (error) {
-            console.error("Cardcom chargeToken error:", error.response?.data || error.message);
+            const isTimeout = error.code === "ETIMEDOUT" || error.code === "ECONNABORTED";
+            console.error(
+                isTimeout
+                    ? "Cardcom chargeToken timed out — server unreachable"
+                    : "Cardcom chargeToken error:",
+                error.response?.data || error.message
+            );
             throw error;
         }
     }

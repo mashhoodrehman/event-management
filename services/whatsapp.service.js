@@ -146,9 +146,9 @@ ${rsvpLink}`;
   },
 
   async sendExternalWhatsApp(phoneNumber, message) {
-    try {
-      const EXTERNAL_API_URL = "https://invitenow-whatsapp-api.revuity.com/api/whatsapp/send";
+    const EXTERNAL_API_URL = "https://invitenow-whatsapp-api.revuity.com/api/whatsapp/send";
 
+    try {
       const requestBody = {
         contact: [
           {
@@ -166,6 +166,7 @@ ${rsvpLink}`;
           "Content-Type": "application/json",
           "Api-key": process.env.EXTERNAL_WHATSAPP_API_KEY || "b52dcc52-4828-44c5-b0c7-54ef96d37d82"
         },
+        timeout: 15000, // 15 second timeout — fail fast if API is unreachable
       });
 
       console.log("✅ External API response:", response.data);
@@ -176,8 +177,11 @@ ${rsvpLink}`;
         recipient: phoneNumber
       };
     } catch (error) {
+      const isTimeout = error.code === "ETIMEDOUT" || error.code === "ECONNABORTED";
       console.error(
-        "❌ External WhatsApp API Error:",
+        isTimeout
+          ? `❌ External WhatsApp API timed out for ${phoneNumber} — server unreachable at ${EXTERNAL_API_URL}`
+          : `❌ External WhatsApp API Error for ${phoneNumber}:`,
         error.response?.data || error.message
       );
       throw error;

@@ -25,7 +25,11 @@ async function enqueueAutomationJob({ type, modelName, taskId, scheduledAt }) {
     },
     {
       delay: delayMs,
-      attempts: 3, // retry a few times
+      attempts: 3,         // retry up to 3 times
+      backoff: {
+        type: "exponential",
+        delay: 30000,       // 30s → 60s → 120s between retries
+      },
       removeOnComplete: true,
       removeOnFail: false,
     }
