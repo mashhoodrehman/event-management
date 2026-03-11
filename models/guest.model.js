@@ -5,7 +5,7 @@ const Event = require("./event.model");
 const Guest = sequelize.define("Guest", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name: { type: DataTypes.STRING, allowNull: false },
-  phone: { type: DataTypes.STRING, allowNull: false },
+  phone: { type: DataTypes.STRING, allowNull: true },
   status: {
     type: DataTypes.ENUM("pending", "confirmed", "hesitate", "cancel"),
     defaultValue: "pending",

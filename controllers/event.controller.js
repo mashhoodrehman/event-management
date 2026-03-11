@@ -192,26 +192,26 @@ const addOrUpdateGuests = async (req, res) => {
         const name = row[0] ? String(row[0]).trim() : null;
         const phoneRaw = row[1] ? String(row[1]).trim() : null;
 
-        if (!name || !phoneRaw) {
-          console.log(111111111);
-          errors.push(`Row ${index + 1}: Missing ${!name ? "name" : "phone"}`);
+        if (!name) {
+          errors.push(`Row ${index + 1}: Missing name`);
           return;
         }
 
-        const normalized = normalizePhone(phoneRaw);
-        if (!normalized) {
-          console.log(22222222);
-          errors.push(`Row ${index + 1}: Invalid phone → ${phoneRaw}`);
-          return;
+        let normalized = null;
+        if (phoneRaw) {
+          normalized = normalizePhone(phoneRaw);
+          if (!normalized) {
+            errors.push(`Row ${index + 1}: Invalid phone → ${phoneRaw}`);
+            return;
+          }
+
+          if (duplicates.has(normalized)) {
+            duplicateLogs.push(`Row ${index + 1}: Duplicate phone → ${phoneRaw}`);
+            return;
+          }
+          duplicates.add(normalized);
         }
 
-        if (duplicates.has(normalized)) {
-          console.log(3333333333);
-          duplicateLogs.push(`Row ${index + 1}: Duplicate phone → ${phoneRaw}`);
-          return;
-        }
-
-        duplicates.add(normalized);
         newGuests.push({
           name,
           phone: normalized,
@@ -230,35 +230,39 @@ const addOrUpdateGuests = async (req, res) => {
         // Remove invisible characters
         const cleanLine = line.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
 
-        // Split by dash (-, –, —) with spaces
-        const parts = cleanLine.split(/\s*[-–—]\s*/);
-        if (parts.length !== 2) {
-          errors.push(`Line ${index + 1}: Invalid format → "${line}"`);
+        let nameTrimmed = "";
+        let phoneTrimmed = "";
+        let normalized = null;
+
+        // Check if line contains a dash separator
+        const separatorMatch = cleanLine.match(/\s*[-–—]\s*/);
+        if (separatorMatch) {
+          const parts = cleanLine.split(/\s*[-–—]\s*/);
+          nameTrimmed = parts[0].trim();
+          phoneTrimmed = parts[1].trim().replace(/[^\d+]/g, "");
+
+          if (phoneTrimmed) {
+            normalized = normalizePhone(phoneTrimmed);
+            if (!normalized) {
+              errors.push(`Line ${index + 1}: Invalid phone → ${phoneTrimmed}`);
+              return;
+            }
+            if (duplicates.has(normalized)) {
+              duplicateLogs.push(`Line ${index + 1}: Duplicate phone → ${phoneTrimmed}`);
+              return;
+            }
+            duplicates.add(normalized);
+          }
+        } else {
+          // Whole line is interpreted as a name
+          nameTrimmed = cleanLine;
+        }
+
+        if (!nameTrimmed) {
+          errors.push(`Line ${index + 1}: Missing name → "${line}"`);
           return;
         }
 
-        const nameTrimmed = parts[0].trim();
-        const phoneTrimmed = parts[1].trim().replace(/[^\d+]/g, "");
-
-        if (!nameTrimmed || !phoneTrimmed) {
-          errors.push(`Line ${index + 1}: Missing name or phone → "${line}"`);
-          return;
-        }
-
-        const normalized = normalizePhone(phoneTrimmed);
-        if (!normalized) {
-          errors.push(`Line ${index + 1}: Invalid phone → ${phoneTrimmed}`);
-          return;
-        }
-
-        if (duplicates.has(normalized)) {
-          duplicateLogs.push(
-            `Line ${index + 1}: Duplicate phone → ${phoneTrimmed}`
-          );
-          return;
-        }
-
-        duplicates.add(normalized);
         newGuests.push({
           name: nameTrimmed,
           phone: normalized,
@@ -283,25 +287,40 @@ const addOrUpdateGuests = async (req, res) => {
       attributes: ["id", "name", "phone", "rsvpToken", "status"],
     });
 
-    const existingMap = new Map(existingGuests.map((g) => [g.phone, g]));
+    const existingMapByPhone = new Map();
+    const existingMapByNameNoPhone = new Map();
+
+    for (const g of existingGuests) {
+      if (g.phone) {
+        existingMapByPhone.set(g.phone, g);
+      } else {
+        existingMapByNameNoPhone.set(g.name, g);
+      }
+    }
 
     const toUpdate = [];
     const toInsert = [];
 
     for (const g of newGuests) {
-      const existing = existingMap.get(g.phone);
+      let existing = null;
+      if (g.phone) {
+        existing = existingMapByPhone.get(g.phone);
+      } else {
+        existing = existingMapByNameNoPhone.get(g.name);
+      }
+
       if (existing) {
-        if (existing.name !== g.name) {
-          toUpdate.push({ id: existing.id, name: g.name });
+        if (existing.name !== g.name || existing.phone !== g.phone) {
+          toUpdate.push({ id: existing.id, name: g.name, phone: g.phone });
         }
       } else {
         toInsert.push(g);
       }
     }
 
-    // Update names
+    // Update names and phones
     for (const u of toUpdate) {
-      await Guest.update({ name: u.name }, { where: { id: u.id } });
+      await Guest.update({ name: u.name, phone: u.phone }, { where: { id: u.id } });
     }
 
     // Insert new guests
