@@ -97,7 +97,7 @@ const verifyAccount = async (token, res) => {
   const user = await User.findOne({ where: { verificationToken: token } });
 
   if (!user) {
-    if (!user) throw new Error("Invalid or expired verification link");
+    throw new Error("Invalid or expired verification link");
   }
 
   user.isVerified = true;
@@ -107,7 +107,7 @@ const verifyAccount = async (token, res) => {
   let successHtml = loadTemplate("verificationSuccess.html");
   successHtml = successHtml.replace(
     /{{loginUrl}}/g,
-    process.env.FRONTEND_LOGIN_URL
+    process.env.FRONTEND_LOGIN_URL.replace('/auth', '/onboarding')
   );
   successHtml = successHtml.replace(
     /{{userName}}/g,
