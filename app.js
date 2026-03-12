@@ -20,6 +20,7 @@ const agentAuthRoutes = require("./routes/agentAuth.routes");
 const seedAgent = require("./seed/agentSeeder");
 const aiCallWebhookRoutes = require("./routes/aiCallWebhook.routes");
 const eventHumanCallsRoutes = require("./routes/eventHumanCalls.routes");
+const deviceRoutes = require("./routes/device.routes");
 
 const path = require("path");
 
@@ -76,6 +77,7 @@ app.use("/api/agent", agentAuthRoutes);
 app.use("/api/webhooks", aiCallWebhookRoutes);
 app.use("/api/event", eventHumanCallsRoutes);
 app.use("/api/whatsapp", require("./routes/whatsapp.routes"));
+app.use("/api/devices", deviceRoutes);
 
 require("./workers/automationWorker");
 require("./workers/emailWorker");
