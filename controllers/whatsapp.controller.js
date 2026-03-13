@@ -2,6 +2,10 @@ const Guest = require("../models/guest.model");
 
 const handleRSVP = async (req, res) => {
     try {
+
+        console.log(req.body)
+
+
         const { eventId, contact, response } = req.body;
 
         if (!eventId || !contact || !response) {
