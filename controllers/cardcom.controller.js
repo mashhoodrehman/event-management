@@ -121,16 +121,16 @@ const cardcomWebhook = async (req, res) => {
                         const webhookUrl = "https://aridar-cms-api.revuity.com/api/whatsapp/status";
 
                         const payload = {
-                            name: `rsvp-bot-${event.id}`,
+                            name: `rsvp-bot-${event.id}-`,
                             webhookUrl: webhookUrl,
                             metaData: {
                                 eventId: event.id
                             },
                             autoReply: true,
                             replyMessages: {
-                                attending: "תודה! נרשמת בהצלחה. ✅",
-                                not_attending: "חבל לפספס אותך! נתראה בשמחות. 😔",
-                                maybe: "הבנו, סימנו אותך כמתלבט. 🤔"
+                                count: `מעולה, רשמנו! נתראה ב ${event.name || "JOHN DOE"} 🎉`,
+                                "לא": "חבל, נתראה בשמחות! ❤️",
+                                "אולי": "אין בעיה, נדבר בהמשך לעדכון. 👍"
                             }
                         };
 

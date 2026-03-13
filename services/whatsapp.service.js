@@ -154,7 +154,7 @@ ${rsvpLink}`;
    */
   async sendBotMessage(phoneNumber, message, eventId) {
     const BOT_SEND_URL = "https://invitenow-qr.revuity.com/bot/send?id=mmrtest";
-    const botName = `rsvp-bot-${eventId}`;
+    const botName = `rsvp-bot-${eventId}-`;
     const receiver = String(phoneNumber).replace(/^\+/, ""); // strip leading +
 
     const requestBody = { receiver, message, botName };
