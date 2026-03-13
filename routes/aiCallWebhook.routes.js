@@ -42,23 +42,23 @@ router.post("/ai-call", async (req, res) => {
 
     if (answer && answer.status) {
       const answerStatus = answer.status.toLowerCase();
-      const guestCount = answer.guests || 0;
+      const peopleCount = answer.guests || 0;
 
       switch (answerStatus) {
         case "yes":
           guest.status = "confirmed";
-          guest.guestCount = guestCount;
+          guest.peopleCount = peopleCount;
           break;
 
         case "no":
           guest.status = "cancel";
-          guest.guestCount = 0;
+          guest.peopleCount = 0;
           break;
 
         case "maybe":
         case "hesitate":
           guest.status = "hesitate";
-          guest.guestCount = guestCount;
+          guest.peopleCount = peopleCount;
           break;
 
         default:
@@ -67,7 +67,7 @@ router.post("/ai-call", async (req, res) => {
 
       await guest.save();
       console.log(
-        `Guest ${guest.name} updated: status=${guest.status}, count=${guest.guestCount}`
+        `Guest ${guest.name} updated: status=${guest.status}, count=${guest.peopleCount}`
       );
     }
 

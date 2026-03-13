@@ -723,6 +723,28 @@ const worker = new Worker(
             const eventType = await EventType.findByPk(event.typeId);
             const eventTypeKey = getEventTypeKeyForCall(eventType?.name || "event");
 
+            console.log(guest , guest.id)
+
+            const requestBody = {
+              customer_name: guest?.name || "",
+              name: guest?.name || "",
+              customer_id: guest ? String(guest.id) : "Unknown",
+              number: task.guestNumber,
+              phone: task.guestNumber,
+              id: String(task.id),
+              event_id: String(event.id),
+              user_id: String(event.userId),
+              [eventTypeKey]: {
+                [event?.name || ""]: {
+                  date: callDate,
+                  time: callTime,
+                  location: event?.location || "",
+                },
+              },
+            };
+
+            console.log("🚀 AI CALL REQUEST BODY:", JSON.stringify(requestBody, null, 2));
+
             const response = await fetch(
               "https://ingestion-api-291837461617.me-west1.run.app/submit-call",
               {
@@ -730,20 +752,7 @@ const worker = new Worker(
                 headers: {
                   "Content-Type": "application/json",
                 },
-                body: JSON.stringify({
-                  customer_name: guest?.name || "",
-                  number: task.guestNumber,
-                  id: String(task.id),
-                  event_id: String(event.id),
-                  user_id: String(event.userId),
-                  [eventTypeKey]: {
-                    [event?.name || ""]: {
-                      date: callDate,
-                      time: callTime,
-                      location: event?.location || "",
-                    },
-                  },
-                }),
+                body: JSON.stringify(requestBody),
               }
             );
 
