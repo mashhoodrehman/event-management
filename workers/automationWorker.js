@@ -485,6 +485,20 @@ const worker = new Worker(
       return;
     }
 
+    // 🛑 NEW: Respect the runAutomation flag
+    if (!event.runAutomation) {
+      console.log(`Automation skipped for event ${event.id}: runAutomation is set to false.`);
+      
+      // Delay and retry logic if we want to wait for it to be enabled
+      // For now, let's just re-enqueue with a 5 minute delay
+      await automationQueue.add(
+        "send-automation",
+        { type, modelName, taskId },
+        { delay: 5 * 60 * 1000, attempts: 3 }
+      );
+      return;
+    }
+
     const user = await User.findByPk(event.userId);
     if (!user) {
       console.warn(`User ${event.userId} not found for task ${task.id}`);

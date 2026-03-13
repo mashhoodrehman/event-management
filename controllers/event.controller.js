@@ -35,8 +35,8 @@ const createOrUpdateEvent = async (req, res) => {
       description,
     } = req.body;
 
-    if (!name || !typeId || !eventDate || !location) {
-      return res.status(400).json({ error: "Required fields missing" });
+    if (!name || !typeId || !eventDate || !location || estimatedGuests === undefined || estimatedGuests === null || estimatedGuests === "") {
+      return res.status(400).json({ error: "Required fields missing (name, typeId, eventDate, location, and estimatedGuests are required)" });
     }
 
     // Helpers to work with *dates only* (no time)
@@ -140,7 +140,7 @@ const createOrUpdateEvent = async (req, res) => {
     res.status(200).json({ message: "Step 1 completed", event });
   } catch (err) {
     console.error("Step 1 Error:", err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Server error", details: err.message, stack: err.stack });
   }
 };
 
@@ -190,7 +190,7 @@ const addOrUpdateGuests = async (req, res) => {
 
       rows.forEach((row, index) => {
         const name = row[0] ? String(row[0]).trim() : null;
-        const phoneRaw = row[1] ? String(row[1]).trim() : null;
+        let phoneRaw = row[1] ? String(row[1]).trim() : null;
 
         if (!name) {
           errors.push(`Row ${index + 1}: Missing name`);
@@ -200,21 +200,25 @@ const addOrUpdateGuests = async (req, res) => {
         let normalized = null;
         if (phoneRaw) {
           normalized = normalizePhone(phoneRaw);
+          // If normalization fails, we still keep the guest but maybe store the raw phone or null
+          // The user wants phone to be optional.
           if (!normalized) {
-            errors.push(`Row ${index + 1}: Invalid phone → ${phoneRaw}`);
-            return;
+            // If it's not a valid phone for our automation, we might still want to store it as is
+            // or just treat it as no phone for automation purposes.
+            // Let's store it as is if it looks like a phone number.
+            normalized = phoneRaw.startsWith('+') ? phoneRaw : null;
           }
 
-          if (duplicates.has(normalized)) {
+          if (normalized && duplicates.has(normalized)) {
             duplicateLogs.push(`Row ${index + 1}: Duplicate phone → ${phoneRaw}`);
             return;
           }
-          duplicates.add(normalized);
+          if (normalized) duplicates.add(normalized);
         }
 
         newGuests.push({
           name,
-          phone: normalized,
+          phone: normalized || (phoneRaw ? phoneRaw : null),
           eventId,
           status: "pending",
           rsvpToken: crypto.randomBytes(16).toString("hex"),
@@ -239,19 +243,19 @@ const addOrUpdateGuests = async (req, res) => {
         if (separatorMatch) {
           const parts = cleanLine.split(/\s*[-–—]\s*/);
           nameTrimmed = parts[0].trim();
-          phoneTrimmed = parts[1].trim().replace(/[^\d+]/g, "");
+          phoneTrimmed = parts[1] ? parts[1].trim() : "";
 
           if (phoneTrimmed) {
             normalized = normalizePhone(phoneTrimmed);
             if (!normalized) {
-              errors.push(`Line ${index + 1}: Invalid phone → ${phoneTrimmed}`);
-              return;
+              // Be lenient: if it has a '+' use it, otherwise keep raw or null
+              normalized = phoneTrimmed.startsWith('+') ? phoneTrimmed : phoneTrimmed;
             }
-            if (duplicates.has(normalized)) {
+            if (normalized && duplicates.has(normalized)) {
               duplicateLogs.push(`Line ${index + 1}: Duplicate phone → ${phoneTrimmed}`);
               return;
             }
-            duplicates.add(normalized);
+            if (normalized) duplicates.add(normalized);
           }
         } else {
           // Whole line is interpreted as a name
@@ -265,7 +269,7 @@ const addOrUpdateGuests = async (req, res) => {
 
         newGuests.push({
           name: nameTrimmed,
-          phone: normalized,
+          phone: normalized || (phoneTrimmed ? phoneTrimmed : null),
           eventId,
           status: "pending",
           rsvpToken: crypto.randomBytes(16).toString("hex"),
@@ -391,12 +395,21 @@ const updateEventSettings = async (req, res) => {
     // ✅ bulk insert all steps
     await EventSetting.bulkCreate(stepRows);
 
-    // optional: mark wizard step as completed
-    await event.update({ status: "step3_completed" });
+    // ✅ update automationEnabled flag
+    if (req.body.automationEnabled !== undefined) {
+      await event.update({ 
+        automationEnabled: req.body.automationEnabled,
+        status: "step3_completed" 
+      });
+    } else {
+      // optional: mark wizard step as completed
+      await event.update({ status: "step3_completed" });
+    }
 
     return res.status(200).json({
       message: "Automation steps saved successfully",
       stepsSaved: stepRows.length,
+      automationEnabled: event.automationEnabled
     });
   } catch (err) {
     console.error("EventSetting error:", err);

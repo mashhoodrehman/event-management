@@ -21,6 +21,7 @@ const seedAgent = require("./seed/agentSeeder");
 const aiCallWebhookRoutes = require("./routes/aiCallWebhook.routes");
 const eventHumanCallsRoutes = require("./routes/eventHumanCalls.routes");
 const deviceRoutes = require("./routes/device.routes");
+const matchingRoutes = require("./routes/matching.routes");
 
 const path = require("path");
 
@@ -78,6 +79,7 @@ app.use("/api/webhooks", aiCallWebhookRoutes);
 app.use("/api/event", eventHumanCallsRoutes);
 app.use("/api/whatsapp", require("./routes/whatsapp.routes"));
 app.use("/api/devices", deviceRoutes);
+app.use("/api/matching", matchingRoutes);
 
 require("./workers/automationWorker");
 require("./workers/emailWorker");
@@ -86,7 +88,7 @@ require("./workers/emailWorker");
 
 // Database Sync
 sequelize
-  .sync()
+  .sync({ alter: true })
   .then(async ({ }) => {
     console.log("✅ MySQL Database Connected & Synced");
 

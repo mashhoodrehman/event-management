@@ -116,6 +116,12 @@ function generateSchedules({ guests, steps, templates, eventId }) {
       for (let i = 0; i < totalGuests; i++) {
         const guest = guests[i];
 
+        // 🚨 SKIP GUESTS WITHOUT PHONE NUMBERS
+        if (!guest.phone) {
+          console.log(`Skipping guest ${guest.name || guest.id} - No phone number`);
+          continue;
+        }
+
         // each task starts 4s after previous task for that date
         const scheduledAt = new Date(
           dateStart.getTime() + offset * PER_TASK_DELAY_MS

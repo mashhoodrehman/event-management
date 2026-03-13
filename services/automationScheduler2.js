@@ -80,6 +80,12 @@ async function createAutomationsForSteps(event, guests, templates, steps) {
 async function createAutomations(event, guests, templates) {
   const eventId = event.id;
 
+  // 🚨 CHECK IF AUTOMATION IS ENABLED FOR THIS EVENT
+  if (event.automationEnabled === false) {
+    console.log(`createAutomations: automation NOT enabled for event ${eventId}, skipping`);
+    return;
+  }
+
   const allSteps = await EventSetting.findAll({
     where: { eventId },
     order: [

@@ -1,7 +1,13 @@
 const Device = require("../models/device.model");
 const Contact = require("../models/contact.model");
 const Event = require("../models/event.model");
+const Guest = require("../models/guest.model");
 const { normalizePhone } = require("../utils/phoneNormalizer");
+const axios = require("axios");
+const whatsappService = require("../services/whatsapp.service");
+
+const EXTERNAL_API_URL = "https://invitenow-ai.revuity.com/api";
+const EXTERNAL_API_KEY = "597fe70bb45c421db3c5a87c677cb8c3";
 
 // Generate a pairing code like A7X-924
 const generatePairingCode = () => {
@@ -15,28 +21,105 @@ const generatePairingCode = () => {
 
 exports.createDevice = async (req, res) => {
     try {
-        const { eventId, name, circle } = req.body;
+        const { event_id, name, circle, phone } = req.body;
+        const localEventId = event_id || req.body.eventId;
 
-        if (!eventId || !name || !circle) {
-            return res.status(400).json({ error: "eventId, name, and circle are required" });
+        if (!localEventId || !name || !circle) {
+            return res.status(400).json({ error: "event_id, name, and circle are required" });
         }
 
-        // Generate unique pairing code
+        const event = await Event.findByPk(localEventId);
+        if (!event) {
+            return res.status(404).json({ error: "Local event not found" });
+        }
+
+        // 1. Ensure external event exists
+        let event_uid = event.event_uid;
+        if (!event_uid) {
+            console.log(`Creating external event for local event ${localEventId}...`);
+            const guests = await Guest.findAll({ where: { eventId: localEventId } });
+            const guestNames = guests.map(g => g.name);
+
+            try {
+                const externalEventRes = await axios.post(`${EXTERNAL_API_URL}/events/create`, {
+                    user_id: event.userId.toString(),
+                    name: event.name,
+                    guests: guestNames
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${EXTERNAL_API_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (externalEventRes.data && externalEventRes.data.event_id) {
+                    event_uid = externalEventRes.data.event_id;
+                    event.event_uid = event_uid;
+                    await event.save();
+                    console.log(`External event created with UID: ${event_uid}`);
+                } else {
+                    throw new Error("Failed to get event_id from external API");
+                }
+            } catch (externalError) {
+                console.error("Error creating external event:", externalError.response?.data || externalError.message);
+                return res.status(502).json({ 
+                    error: "Failed to create external event", 
+                    details: externalError.response?.data || externalError.message 
+                });
+            }
+        }
+
+        // 2. Create external device
+        console.log(`Creating external device for event ${event_uid}...`);
         let pairingCode;
-        let codeExists = true;
-        while (codeExists) {
-            pairingCode = generatePairingCode();
-            const existing = await Device.findOne({ where: { pairingCode } });
-            codeExists = !!existing;
+        try {
+            const externalDeviceRes = await axios.post(`${EXTERNAL_API_URL}/devices/create`, {
+                event_id: event_uid,
+                name: name,
+                circle: circle
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${EXTERNAL_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (externalDeviceRes.data && externalDeviceRes.data.pairing_code) {
+                pairingCode = externalDeviceRes.data.pairing_code;
+                console.log(`External device created with pairing code: ${pairingCode}`);
+            } else {
+                throw new Error("Failed to get pairing_code from external API");
+            }
+        } catch (deviceError) {
+            console.error("Error creating external device:", deviceError.response?.data || deviceError.message);
+            // Fallback to local generation if external fails? No, user wants it completed first.
+            return res.status(502).json({ 
+                error: "Failed to create external device", 
+                details: deviceError.response?.data || deviceError.message 
+            });
         }
 
+        // 3. Create local device record
         const device = await Device.create({
-            eventId,
+            eventId: localEventId,
             name,
             circle,
             pairingCode,
+            phone,
             status: "pending"
         });
+
+        // 4. Send WhatsApp invitation if phone is provided
+        if (phone && (circle === 2 || circle === 3)) {
+            try {
+                const message = `היי ${name}! הוזמנת לעזור בארגון האירוע "${event.name}". \n\nאנא התקן את אפליקציית InviteNow והשתמש בקוד ההתחברות שלך: ${pairingCode}`;
+                await whatsappService.sendExternalWhatsApp(phone, message);
+                console.log(`WhatsApp invitation sent to ${phone}`);
+            } catch (waError) {
+                console.error("Failed to send WhatsApp invitation:", waError.message);
+                // We don't fail the whole request because the device was created.
+            }
+        }
 
         res.status(201).json(device);
     } catch (error) {
@@ -148,5 +231,43 @@ exports.uploadContacts = async (req, res) => {
     } catch (error) {
         console.error("Error uploading contacts:", error);
         res.status(500).json({ error: "Internal server error" });
+    }
+};
+
+exports.checkDeviceStatuses = async (req, res) => {
+    try {
+        const { device_ids } = req.body;
+
+        if (!device_ids || !Array.isArray(device_ids)) {
+            return res.status(400).json({ error: "device_ids array is required" });
+        }
+
+        const externalRes = await axios.post(`${EXTERNAL_API_URL}/devices/status`, {
+            device_ids
+        }, {
+            headers: {
+                'Authorization': `Bearer ${EXTERNAL_API_KEY}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // Sync local database if status changed to connected
+        const externalDevices = externalRes.data.devices || [];
+        for (const extDevice of externalDevices) {
+            if (extDevice.status === 'connected') {
+                await Device.update(
+                    { status: 'connected' },
+                    { where: { pairingCode: extDevice.pairing_code, status: 'pending' } }
+                );
+            }
+        }
+
+        res.json(externalRes.data);
+    } catch (error) {
+        console.error("Error checking device statuses:", error.response?.data || error.message);
+        res.status(error.response?.status || 500).json({ 
+            error: "Failed to check device statuses",
+            details: error.response?.data || error.message 
+        });
     }
 };

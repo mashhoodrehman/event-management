@@ -20,6 +20,10 @@ const Device = sequelize.define("Device", {
         defaultValue: "pending",
         allowNull: false,
     },
+    phone: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
 });
 
 // Relationships

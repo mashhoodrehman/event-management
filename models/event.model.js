@@ -28,6 +28,10 @@ const Event = sequelize.define("Event", {
     ),
     defaultValue: "draft",
   },
+  event_uid: { type: DataTypes.STRING, allowNull: true },
+  automationEnabled: { type: DataTypes.BOOLEAN, defaultValue: false },
+  isMatchingCompleted: { type: DataTypes.BOOLEAN, defaultValue: false },
+  runAutomation: { type: DataTypes.BOOLEAN, defaultValue: false },
   // ⚡ Virtual active field — NOT stored in DB
   active: {
     type: DataTypes.VIRTUAL,

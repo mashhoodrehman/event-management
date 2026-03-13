@@ -33,6 +33,8 @@ const cardcomWebhook = async (req, res) => {
         const CardMonth = data.TokenInfo?.CardMonth || data.TranzactionInfo?.CardMonth || data.CardMonth;
         const CardYear = data.TokenInfo?.CardYear || data.TranzactionInfo?.CardYear || data.CardYear;
 
+        console.log(ReturnValue , "return value")
+
         if (String(ResponseCode) !== "0") {
             console.warn("Cardcom transaction failed reported by webhook:", data);
             return res.send("OK"); // Still return OK to Cardcom
