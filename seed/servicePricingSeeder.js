@@ -12,25 +12,25 @@ async function seedServicePricing() {
     {
       key: "sms_fee",
       name: "SMS Fee",
-      priceAgorot: 200, // ₪0.15
+      priceAgorot: 10, // ₪0.10
       description: "Charged per SMS automation send.",
     },
     {
       key: "whatsapp_fee",
       name: "WhatsApp Fee",
-      priceAgorot: 200, // ₪0.25
+      priceAgorot: 19, // ₪0.19
       description: "Charged per WhatsApp automation send.",
     },
     {
       key: "ai_call_fee",
       name: "AI Call Fee",
-      priceAgorot: 250, // ₪2.50
+      priceAgorot: 50, // ₪0.50
       description: "Charged per AI call automation.",
     },
     {
       key: "human_call_fee",
       name: "Human Call Fee",
-      priceAgorot: 1500, // ₪15.00
+      priceAgorot: 100, // ₪1.00
       description: "Charged per human call automation.",
     },
   ];
