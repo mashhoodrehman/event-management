@@ -731,6 +731,7 @@ const worker = new Worker(
               customer_id: guest ? String(guest.id) : "Unknown",
               number: task.guestNumber,
               phone: task.guestNumber,
+              wedding:event.name? event.name : "Event",
               id: String(task.id),
               event_id: String(event.id),
               user_id: String(event.userId),
