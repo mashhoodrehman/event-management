@@ -28,33 +28,15 @@ const path = require("path");
 const app = express();
 
 // ✅ Enable CORS (important!)
-const allowedOrigins = [
-  "http://localhost:8080",
-  "http://localhost:3000",
-  "https://aridar-cms.revuity.com",
-  "http://app-frontend-react.cvvm9olplp-gjy3m9eyd48q.p.temp-site.link",
-];
-
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // allow Postman, mobile apps, server-to-server
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
+    origin: true, // allows any origin and reflects it back to support credentials: true
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
   })
 );
 
-// 🔥 Required for browser preflight requests
-app.use(cors());
 
 // Middleware
 app.use(bodyParser.json());
