@@ -37,7 +37,7 @@ const signup = async (req) => {
     verificationToken,
   });
 
-  const verificationLink = `https://aridar-cms-api.revuity.com/api/auth/verify?token=${verificationToken}`;
+  const verificationLink = `https://invitenow-ai.com/api/auth/verify?token=${verificationToken}`;
   let emailTemplate = loadTemplate("verificationEmail.html");
 
   emailTemplate = emailTemplate
@@ -138,7 +138,7 @@ const forgotPassword = async (email) => {
   user.updatedAt = new Date();
   await user.save();
 
-  const resetLink = `https://aridar-cms.revuity.com/reset-password/${token}`;
+  const resetLink = `https://invitenow-ai.com/reset-password/${token}`;
   await sendResetEmail(email, resetLink);
   return {
     message: "Password reset link sent",
