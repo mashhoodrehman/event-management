@@ -110,8 +110,13 @@ exports.confirmGuest = async (req, res) => {
     );
 
     // 2. Update local guest record
+    let finalEventId = eventId;
     if (localGuestId) {
-      await Guest.update({ phone }, { where: { id: localGuestId } });
+      const g = await Guest.findByPk(localGuestId);
+      if (g) {
+        await g.update({ phone });
+        finalEventId = g.eventId;
+      }
     } else if (eventId && name) {
       // Find guest by name and eventId
       const guest = await Guest.findOne({ 
@@ -122,6 +127,21 @@ exports.confirmGuest = async (req, res) => {
       });
       if (guest) {
         await guest.update({ phone });
+      }
+    }
+
+    if (finalEventId) {
+      const allGuests = await Guest.findAll({ where: { eventId: finalEventId } });
+      if (allGuests.length > 0) {
+        const allHavePhone = allGuests.every(g => g.phone && g.phone.trim() !== "");
+        if (allHavePhone) {
+          const event = await Event.findByPk(finalEventId);
+          if (event && !event.isMatchingCompleted) {
+            event.isMatchingCompleted = true;
+            event.runAutomation = true;
+            await event.save();
+          }
+        }
       }
     }
 
