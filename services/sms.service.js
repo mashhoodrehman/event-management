@@ -46,7 +46,7 @@ module.exports = {
       if (rsvpToken) {
         const baseUrl =
           process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
-        const link = `${baseUrl}/rsvp?token=${rsvpToken}`;
+        const link = `${baseUrl}?token=${rsvpToken}`;
 
         // Only append if the link is not already inside the message
         if (!message.includes(link)) {
