@@ -49,10 +49,10 @@ const addGuestManual = async (req, res) => {
         .status(400)
         .json({ success: false, message: "eventId required" });
 
-    if (!name?.trim() || !phone?.trim())
+    if (!name?.trim())
       return res
         .status(400)
-        .json({ success: false, message: "Name and phone are required" });
+        .json({ success: false, message: "Name is required" });
 
     const event = await Event.findByPk(eventId);
     if (!event)
@@ -60,22 +60,25 @@ const addGuestManual = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Event not found" });
 
-    const normalizedPhone = normalizePhone(phone);
-    if (!normalizedPhone)
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid phone number" });
+    let normalizedPhone = null;
+    if (phone && phone.trim()) {
+      normalizedPhone = normalizePhone(phone);
+      if (!normalizedPhone) {
+        return res.status(400).json({ success: false, message: "Invalid phone number" });
+      }
 
-    // ❌ duplicate check (per event)
-    const exists = await Guest.findOne({
-      where: { eventId, phone: normalizedPhone },
-    });
-
-    if (exists)
-      return res.status(409).json({
-        success: false,
-        message: "Guest with this phone already exists",
+      // Duplicate check (per event) only if phone exists
+      const exists = await Guest.findOne({
+        where: { eventId, phone: normalizedPhone },
       });
+
+      if (exists) {
+        return res.status(409).json({
+          success: false,
+          message: "Guest with this phone already exists",
+        });
+      }
+    }
 
     const guest = await Guest.create({
       eventId,

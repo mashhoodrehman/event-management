@@ -177,33 +177,43 @@ ${rsvpLink}`;
     }
   },
 
-  async sendExternalWhatsApp(phoneNumber, message) {
-    const EXTERNAL_API_URL = "https://invitenow-whatsapp-api.revuity.com/api/whatsapp/send";
+  /**
+   * Send a WhatsApp message via bot with autoReply replyMessages
+   * (same format as the cardcom webhook bot config)
+   * @param {string} phoneNumber - recipient phone
+   * @param {string} message - invitation/device text to send
+   * @param {object} options - { eventId, eventName } for autoReply messages
+   */
+  async sendExternalWhatsApp(phoneNumber, message, options = {}) {
+    const BOT_SEND_URL = "https://invitenow-qr.revuity.com/bot/send?id=mmrtest";
+    const { eventId, eventName } = options;
+
+    const botName = eventId ? `rsvp-bot-${eventId}-` : "rsvp-bot-default-";
+    const receiver = String(phoneNumber).replace(/^\+/, ""); // strip leading +
+
+    const requestBody = {
+      receiver,
+      message,
+      botName,
+      ...(eventId ? {
+        autoReply: true,
+        replyMessages: {
+          "כן": `מעולה, רשמנו! נתראה ב ${eventName || "האירוע"} 🎉`,
+          "לא": "חבל, נתראה בשמחות! ❤️",
+          "אולי": "אין בעיה, נדבר בהמשך לעדכון. 👍"
+        }
+      } : {})
+    };
+
+    console.log(`📨 Sending bot message via ${botName} to: ${phoneNumber}`);
 
     try {
-      const requestBody = {
-        contact: [
-          {
-            number: phoneNumber,
-            message: message || "היי! האם אתם מגיעים לאירוע? \n\n1. כן, מגיעים\n2. לא, לא נוכל להגיע\n3. אולי",
-            sms_type: "plain"
-          }
-        ]
-      };
-
-      console.log("📨 Sending via External WhatsApp API to:", phoneNumber);
-
-      const response = await withRetry(async () => {
-        return await axios.post(EXTERNAL_API_URL, requestBody, {
-          headers: {
-            "Content-Type": "application/json",
-            "Api-key": process.env.EXTERNAL_WHATSAPP_API_KEY || "b52dcc52-4828-44c5-b0c7-54ef96d37d82"
-          },
-          timeout: 30000,
-        });
+      const response = await axios.post(BOT_SEND_URL, requestBody, {
+        headers: { "Content-Type": "application/json" },
+        timeout: 30000,
       });
 
-      console.log("✅ External API response:", response.data);
+      console.log("✅ Bot send (external) response:", response.data);
 
       return {
         success: true,
@@ -214,8 +224,8 @@ ${rsvpLink}`;
       const isTimeout = error.code === "ETIMEDOUT" || error.code === "ECONNABORTED";
       console.error(
         isTimeout
-          ? `❌ External WhatsApp API timed out for ${phoneNumber} — server unreachable at ${EXTERNAL_API_URL} after retries`
-          : `❌ External WhatsApp API Error for ${phoneNumber}:`,
+          ? `❌ Bot send timed out for ${phoneNumber} after retries`
+          : `❌ Bot send error for ${phoneNumber}:`,
         error.response?.data || error.message
       );
       throw error;

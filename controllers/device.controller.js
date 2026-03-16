@@ -112,8 +112,11 @@ exports.createDevice = async (req, res) => {
         // 4. Send WhatsApp invitation if phone is provided
         if (phone && (circle === 2 || circle === 3)) {
             try {
-                const message = `היי ${name}! הוזמנת לעזור בארגון האירוע "${event.name}". \n\nאנא התקן את אפליקציית InviteNow והשתמש בקוד ההתחברות שלך: ${pairingCode}`;
-                await whatsappService.sendExternalWhatsApp(phone, message);
+                const message = `היי ${name}! הוזמנת לעזור בארגון האירוע "${event.name}". \nאנא התקן את אפליקציית InviteNow והשתמש בקוד ההתחברות שלך: ${pairingCode}`;
+                await whatsappService.sendExternalWhatsApp(phone, message, {
+                    eventId: localEventId,
+                    eventName: event.name
+                });
                 console.log(`WhatsApp invitation sent to ${phone}`);
             } catch (waError) {
                 console.error("Failed to send WhatsApp invitation:", waError.message);
