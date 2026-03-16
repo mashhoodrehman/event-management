@@ -345,7 +345,7 @@ async function processAutomation(model, type) {
           case "SMS": {
             const baseUrl =
               process.env.FRONTEND_BASE_URL || "http://localhost:8080/rsvp";
-            const rsvpLink = `${baseUrl}?token=${task.rsvpToken}&via=sms`;
+            const rsvpLink = `${baseUrl}/rsvp?token=${task.rsvpToken}&via=sms`;
 
             const eventName = event?.name || "";
             const eventDateObj = event?.eventDate || null;
