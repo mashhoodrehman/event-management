@@ -50,7 +50,7 @@ const processSetupFee = async (req, res) => {
     // Indicator URL for webhook
     const indicatorUrl = `${process.env.BASE_URL}/api/cardcom/indicator`;
     const successUrl = `https://www.invitenow-ai.com/onboarding?step=6&eventId=${eventId}`;
-    const errorUrl = `https://www.invitenow-ai.com//payment-error?eventId=${eventId}`;
+    const errorUrl = `https://www.invitenow-ai.com/payment-error?eventId=${eventId}`;
 
     // Create Cardcom Payment Link
     const redirectUrl = await CardcomService.createPaymentLink({
