@@ -47,7 +47,7 @@ const signup = async (req) => {
     .replace(/{{year}}/g, new Date().getFullYear());
 
   await enqueueEmailJob({
-    from: "orders@simtlv.co.il",
+    from: "no-reply@invitenow-ai.com\n",
     to: email,
     subject: "Verify your account",
     html: emailTemplate,
