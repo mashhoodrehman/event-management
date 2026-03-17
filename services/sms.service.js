@@ -59,7 +59,7 @@ module.exports = {
           user: {
             username: process.env.SMS_API_USERNAME || "simtlv99",
           },
-          source: process.env.SMS_SOURCE_NAME || "SIMTLV",
+          source: process.env.SMS_SOURCE_NAME || "InviteNow",
           destinations: {
             phone: cleanedPhoneNumber,
           },
