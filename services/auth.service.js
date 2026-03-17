@@ -37,7 +37,7 @@ const signup = async (req) => {
     verificationToken,
   });
 
-  const verificationLink = `https://invitenow-ai.com/api/auth/verify?token=${verificationToken}`;
+  const verificationLink = `https://api.invitenow-ai.com/api/auth/verify?token=${verificationToken}`;
   let emailTemplate = loadTemplate("verificationEmail.html");
 
   emailTemplate = emailTemplate
