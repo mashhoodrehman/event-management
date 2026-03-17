@@ -691,12 +691,13 @@ const worker = new Worker(
             formattedDate = new Date(eventDateObj).toLocaleDateString("he-IL");
           }
 
-          const message = `היי! האם אתם מגיעים לאירוע? \n\n1. כן, מגיעים\n2. לא, לא נוכל להגיע\n3. אולי`;
+          const message = `היי! מגיעים ל*${event.name || "האירוע"}*? 🥂\n\n✅ מגיעים? שלחו את מספר האנשים (למשל: 2)\n\n❌ לא מגיעים? שלחו: לא\n\n🤔 אולי? שלחו: אולי`;
 
           await whatsappService.sendBotMessage(
             task.guestNumber,
             message,
-            event.id
+            event.id,
+            event.name
           );
           task.status = "success";
           task.isTriggered = true;
@@ -871,12 +872,13 @@ const worker = new Worker(
 
           const guestName = guest?.name || "";
 
-          const message = `היי! האם אתם מגיעים לאירוע? \n\n1. כן, מגיעים\n2. לא, לא נוכל להגיע\n3. אולי`;
+          const message = `היי! מגיעים ל*${event.name || "האירוע"}*? 🥂\n\n✅ מגיעים? שלחו את מספר האנשים (למשל: 2)\n\n❌ לא מגיעים? שלחו: לא\n\n🤔 אולי? שלחו: אולי`;
 
           await whatsappService.sendBotMessage(
             task.guestNumber,
             message,
-            event.id
+            event.id,
+            event.name
           );
           task.status = "success";
           task.isTriggered = true;

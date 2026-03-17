@@ -147,17 +147,28 @@ ${rsvpLink}`;
   },
 
   /**
-   * Send a message via the bot send endpoint
+   * Send a message via the bot send endpoint with autoReply
    * @param {string} phoneNumber - recipient phone (with or without +)
    * @param {string} message - invitation message text
    * @param {number|string} eventId - used to build botName rsvp-bot-{eventId}
+   * @param {string} eventName - used in autoReply confirmation message
    */
-  async sendBotMessage(phoneNumber, message, eventId) {
+  async sendBotMessage(phoneNumber, message, eventId, eventName = "") {
     const BOT_SEND_URL = "https://invitenow-qr.revuity.com/bot/send?id=mmrtest";
     const botName = `rsvp-bot-${eventId}-`;
     const receiver = String(phoneNumber).replace(/^\+/, ""); // strip leading +
 
-    const requestBody = { receiver, message, botName };
+    const requestBody = {
+      receiver,
+      message,
+      botName,
+      autoReply: true,
+      replyMessages: {
+        "כן": `מעולה, רשמנו! נתראה ב ${eventName || "האירוע"} 🎉`,
+        "לא": "חבל, נתראה בשמחות! ❤️",
+        "אולי": "אין בעיה, נדבר בהמשך לעדכון. 👍"
+      }
+    };
 
     console.log(`📨 Sending bot message via ${botName} to: ${phoneNumber}`);
 
