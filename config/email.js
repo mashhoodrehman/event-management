@@ -2,8 +2,8 @@ const nodemailer = require("nodemailer");
 require("dotenv").config();
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
+  host: "smtp.elasticemail.com",
+  port: 2525,
   secure: false, // must be false for TLS on port 587
   auth: {
     user: process.env.EMAIL_USER, // orders@simtlv.co.il
