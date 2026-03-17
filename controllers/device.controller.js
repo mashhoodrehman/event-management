@@ -138,6 +138,8 @@ exports.getDevicesByEvent = async (req, res) => {
             where: { eventId },
             order: [["createdAt", "ASC"]]
         });
+
+
         res.json({ devices });
     } catch (error) {
         console.error("Error fetching devices:", error);
