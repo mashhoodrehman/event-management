@@ -6,6 +6,7 @@ const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const EventSetting = require("../models/eventSetting.model");
 const { generateSchedules } = require("./generateSchedules");
 const { enqueueAutomationJob } = require("../queues/automationQueue");
+const Guest = require("../models/guest.model");
 
 /**
  * Create automation tasks AFTER payment succeeds.
@@ -44,6 +45,12 @@ async function createAutomations(event, guests, templates) {
       `createAutomations: no guests found for event ${eventId}, nothing to schedule`
     );
     return;
+  }
+
+  // 1.5) Update guest process_status
+  for (const guest of guests) {
+    const status = guest.phone ? "processed" : "skipped";
+    await Guest.update({ processStatus: status }, { where: { id: guest.id } });
   }
 
   // 2) generate tasks (with 4 second spacing + correct order per date)

@@ -19,6 +19,8 @@ const EventSetting = require("../models/eventSetting.model");
 const Guest = require("../models/guest.model");
 const User = require("../models/user.model");
 const Payment = require("../models/payment.model");
+const MessageTemplate = require("../models/messageTemplate.model");
+const { createAutomations } = require("../services/automationScheduler");
 
 // ---------- Template helper ----------
 function loadTemplate(fileName) {
@@ -442,6 +444,52 @@ async function processAutomation(model, type) {
 }
 
 /**
+ * Find guests who were skipped because of missing phone number,
+ * but now have one, and schedule automations for them.
+ */
+async function backfillSkippedGuests() {
+  try {
+    // Find guests who were 'skipped' (no phone at trigger time) but now have a phone number.
+    const guestsToProcess = await Guest.findAll({
+      where: {
+        processStatus: "skipped",
+        phone: { [Op.ne]: null },
+      },
+      include: [Event],
+    });
+
+    if (!guestsToProcess.length) return;
+
+    console.log(`Found ${guestsToProcess.length} skipped guests with phone numbers. Backfilling...`);
+
+    // Group by eventId to minimize template fetches
+    const byEvent = guestsToProcess.reduce((acc, g) => {
+      if (!acc[g.eventId]) acc[g.eventId] = { event: g.Event, guests: [] };
+      acc[g.eventId].guests.push(g);
+      return acc;
+    }, {});
+
+    for (const [eventId, data] of Object.entries(byEvent)) {
+      const { event, guests } = data;
+      if (!event) continue;
+
+      const template = await MessageTemplate.findOne({ where: { eventId } });
+      const templates = {
+        smsTemplateId: template?.id || null,
+        whatsappTemplateId: template?.id || null,
+        aiCallTemplateId: template?.id || null,
+        humanCallTemplateId: template?.id || null,
+      };
+
+      await createAutomations(event, guests, templates);
+      console.log(`Successfully processed ${guests.length} backfilled guests for event ${eventId}`);
+    }
+  } catch (err) {
+    console.error("Error in backfillSkippedGuests:", err);
+  }
+}
+
+/**
  * Cron job to run every minute
  */
 cron.schedule("* * * * *", async () => {
@@ -451,6 +499,9 @@ cron.schedule("* * * * *", async () => {
   await processAutomation(WhatsAppAutomation, "WhatsApp");
   await processAutomation(AICallAutomation, "AI_CALL");
   await processAutomation(HumanCallAutomation, "HUMAN_CALL");
+
+  // Run backfill for skipped guests
+  await backfillSkippedGuests();
 });
 
 //////////////////////////////////////////////////////////////////////

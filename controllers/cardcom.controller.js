@@ -6,7 +6,6 @@ const Event = require("../models/event.model");
 const User = require("../models/user.model");
 const Guest = require("../models/guest.model");
 const MessageTemplate = require("../models/messageTemplate.model");
-const EventAutomationSchedule = require("../models/eventAutomationSchedule.model");
 const EventSetting = require("../models/eventSetting.model");
 const { createAutomations } = require("../services/automationScheduler");
 
@@ -33,7 +32,7 @@ const cardcomWebhook = async (req, res) => {
         const CardMonth = data.TokenInfo?.CardMonth || data.TranzactionInfo?.CardMonth || data.CardMonth;
         const CardYear = data.TokenInfo?.CardYear || data.TranzactionInfo?.CardYear || data.CardYear;
 
-        console.log(ReturnValue , "return value")
+        console.log(ReturnValue, "return value")
 
         if (String(ResponseCode) !== "0") {
             console.warn("Cardcom transaction failed reported by webhook:", data);

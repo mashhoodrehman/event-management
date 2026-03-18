@@ -20,6 +20,11 @@ const Guest = sequelize.define("Guest", {
   rsvpToken: { type: DataTypes.STRING, unique: true }, // token for link
   //   eventId: { type: DataTypes.INTEGER, allowNull: false },
   respondedVia: { type: DataTypes.STRING, allowNull: true },
+  processStatus: {
+    type: DataTypes.ENUM("pending", "processed", "skipped"),
+    defaultValue: "pending",
+    allowNull: false,
+  },
 });
 
 // Relationships

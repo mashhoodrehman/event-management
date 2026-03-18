@@ -8,9 +8,6 @@ const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const { formatTimeAgo } = require("../utils/timeAgo");
 const ActivityService = require("../services/activityService");
-const Payment = require("../models/payment.model");
-const MessageTemplate = require("../models/messageTemplate.model");
-const { createAutomations } = require("../services/automationScheduler");
 
 /**
  * Update guest RSVP status
@@ -93,25 +90,6 @@ const addGuestManual = async (req, res) => {
     });
 
     res.status(201).json({ success: true, data: guest });
-
-    // 🚀 NEW: Trigger automations if payment already succeeded
-    if (normalizedPhone) {
-      const paymentSucceeded = await Payment.findOne({
-        where: { eventId, type: "setup_fee", status: "succeeded" },
-      });
-
-      if (paymentSucceeded) {
-        const template = await MessageTemplate.findOne({ where: { eventId } });
-        const templates = {
-          smsTemplateId: template?.id || null,
-          whatsappTemplateId: template?.id || null,
-          aiCallTemplateId: template?.id || null,
-          humanCallTemplateId: template?.id || null,
-        };
-        await createAutomations(event, [guest], templates);
-        console.log(`[Backfill] Scheduled automations for manual guest ${guest.id} for event ${eventId}`);
-      }
-    }
   } catch (err) {
     console.error("addGuestManual error:", err);
     res.status(500).json({ success: false, message: "Server error" });
@@ -794,6 +772,10 @@ module.exports = {
   getGuestStats,
   getPendingFollowupGuests,
   addGuestManual,
+  getWeeklyActivity,
+  getConfirmedGuestsWithHistory,
+};
+addGuestManual,
   getWeeklyActivity,
   getConfirmedGuestsWithHistory,
 };
