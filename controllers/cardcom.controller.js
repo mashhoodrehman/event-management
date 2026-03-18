@@ -117,7 +117,7 @@ const cardcomWebhook = async (req, res) => {
                     // trigger Bot Config API after payment is confirmed
                     try {
                         const botConfigUrl = `https://invitenow-qr.revuity.com/bot/config?id=mmrtest`;
-                        const webhookUrl = "https://invitenow-ai.com/api/whatsapp/status";
+                        const webhookUrl = "https://api.invitenow-ai.com/api/whatsapp/status";
 
                         const payload = {
                             name: `rsvp-bot-${event.id}-`,
