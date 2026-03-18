@@ -775,7 +775,3 @@ module.exports = {
   getWeeklyActivity,
   getConfirmedGuestsWithHistory,
 };
-addGuestManual,
-  getWeeklyActivity,
-  getConfirmedGuestsWithHistory,
-};
