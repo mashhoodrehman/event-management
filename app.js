@@ -66,7 +66,7 @@ app.use("/api/matching", matchingRoutes);
 require("./workers/automationWorker");
 require("./workers/emailWorker");
 
-require("./cron/automationRunner");
+require("./cron/backfillCron");
 
 // Database Sync
 sequelize

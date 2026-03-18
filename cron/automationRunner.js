@@ -435,6 +435,7 @@ async function processAutomation(model, type) {
           `Failed to execute ${type} for ${task.guestNumber}:`,
           err
         );
+        task.status = "failed";
         await task.save();
       }
     }
