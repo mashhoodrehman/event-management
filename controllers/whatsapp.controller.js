@@ -1,7 +1,7 @@
 const Guest = require("../models/guest.model");
 
 const handleRSVP = async (req, res) => {
-    try {
+    // try {
         console.log("🔔 WhatsApp Webhook Received:", JSON.stringify(req.body, null, 2));
 
         const data = req.body;
@@ -77,13 +77,13 @@ const handleRSVP = async (req, res) => {
                 peopleCount: guest.peopleCount
             }
         });
-    } catch (error) {
-        console.error("❌ RSVP Controller Error:", error);
-        return res.status(500).json({
-            success: false,
-            error: error.message || "Failed to process RSVP",
-        });
-    }
+    // } catch (error) {
+    //     console.error("❌ RSVP Controller Error:", error);
+    //     return res.status(500).json({
+    //         success: false,
+    //         error: error.message || "Failed to process RSVP",
+    //     });
+    // }
 };
 
 module.exports = {
