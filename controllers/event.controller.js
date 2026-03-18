@@ -12,9 +12,10 @@ const WhatsAppAutomation = require("../models/whatsAppAutomation.model");
 const AICallAutomation = require("../models/aICallAutomation.model");
 const HumanCallAutomation = require("../models/humanCallAutomation.model");
 const {
-  createAutomations,
+  createAutomations: createAutomationsFuture,
   createAutomationsForSteps,
 } = require("../services/automationScheduler2");
+const { createAutomations: createAutomationsAll } = require("../services/automationScheduler");
 
 const xlsx = require("xlsx");
 
@@ -305,6 +306,8 @@ const addOrUpdateGuests = async (req, res) => {
     const toUpdate = [];
     const toInsert = [];
 
+    const guestsToSchedule = [];
+
     for (const g of newGuests) {
       let existing = null;
       if (g.phone) {
@@ -315,10 +318,17 @@ const addOrUpdateGuests = async (req, res) => {
 
       if (existing) {
         if (existing.name !== g.name || existing.phone !== g.phone) {
+          // Identify if it's a backfill: previously no phone, now has one
+          if (!existing.phone && g.phone) {
+            guestsToSchedule.push({ ...existing.get(), phone: g.phone, name: g.name });
+          }
           toUpdate.push({ id: existing.id, name: g.name, phone: g.phone });
         }
       } else {
         toInsert.push(g);
+        if (g.phone) {
+          guestsToSchedule.push(g);
+        }
       }
     }
 
@@ -342,6 +352,24 @@ const addOrUpdateGuests = async (req, res) => {
       duplicates: duplicateLogs,
       totalGuests: existingGuests.length + toInsert.length,
     });
+
+    // 🚀 NEW: Check if we should trigger automations for newly added/updated guests
+    const paymentSucceeded = await Payment.findOne({
+      where: { eventId, type: "setup_fee", status: "succeeded" }
+    });
+
+    if (paymentSucceeded && guestsToSchedule.length > 0) {
+      const template = await MessageTemplate.findOne({ where: { eventId } });
+      const templates = {
+        smsTemplateId: template?.id || null,
+        whatsappTemplateId: template?.id || null,
+        aiCallTemplateId: template?.id || null,
+        humanCallTemplateId: template?.id || null,
+      };
+      // Use the base createAutomations that handles TODAY correctly
+      await createAutomationsAll(event, guestsToSchedule, templates);
+      console.log(`[Backfill] Scheduled automations for ${guestsToSchedule.length} newly valid guests for event ${eventId}`);
+    }
   } catch (err) {
     console.error("Step 2 Error:", err);
     res.status(500).json({ error: "Server error" });
@@ -815,7 +843,7 @@ const updateAutomationSettings = async (req, res) => {
       humanCallTemplateId: template?.id || null,
     };
 
-    await createAutomations(event, guests, templates); // → only future
+    await createAutomationsFuture(event, guests, templates); // → only future
 
     // ✅ 5) create tasks for TODAY's *new* steps only (no duplication)
     if (todayRows.length > 0) {

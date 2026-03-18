@@ -163,11 +163,6 @@ ${rsvpLink}`;
       message,
       botName,
       autoReply: true,
-      replyMessages: {
-        "כן": `מעולה, רשמנו! נתראה ב ${eventName || "האירוע"} 🎉`,
-        "לא": "חבל, נתראה בשמחות! ❤️",
-        "אולי": "אין בעיה, נדבר בהמשך לעדכון. 👍"
-      }
     };
 
     console.log(`📨 Sending bot message via ${botName} to: ${phoneNumber}`);
