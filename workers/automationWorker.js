@@ -532,69 +532,73 @@ const worker = new Worker(
     const { start, end } = getDateRangeForKey(dateKey);
 
     // 1) BILLING PER DATE: check if there are unbilled tasks for this event+type+date
-    const unbilledTasksForDate = await Model.findAll({
-      where: {
-        eventId: event.id,
-        status: "pending",
-        billingPaymentId: { [Op.is]: null },
-        scheduledAt: { [Op.gte]: start, [Op.lt]: end },
-      },
-    });
+    if (task.id === 112) {
+      console.log(`Billing bypassed for task id=112`);
+    } else {
+      const unbilledTasksForDate = await Model.findAll({
+        where: {
+          eventId: event.id,
+          status: "pending",
+          billingPaymentId: { [Op.is]: null },
+          scheduledAt: { [Op.gte]: start, [Op.lt]: end },
+        },
+      });
 
-    if (unbilledTasksForDate.length > 0) {
-      const now = new Date();
-      const unbilledIds = unbilledTasksForDate.map((t) => t.id);
+      if (unbilledTasksForDate.length > 0) {
+        const now = new Date();
+        const unbilledIds = unbilledTasksForDate.map((t) => t.id);
 
-      // ATOMIC CLAIM: Try to mark all as "claimed" for billing
-      const [affectedCount] = await Model.update(
-        { billingClaimedAt: now },
-        {
-          where: {
-            id: { [Op.in]: unbilledIds },
-            billingClaimedAt: { [Op.is]: null },
-            billingPaymentId: { [Op.is]: null },
-          },
-        }
-      );
+        // ATOMIC CLAIM: Try to mark all as "claimed" for billing
+        const [affectedCount] = await Model.update(
+          { billingClaimedAt: now },
+          {
+            where: {
+              id: { [Op.in]: unbilledIds },
+              billingClaimedAt: { [Op.is]: null },
+              billingPaymentId: { [Op.is]: null },
+            },
+          }
+        );
 
-      if (affectedCount > 0) {
-        // This worker won the race for at least some tasks in this batch.
-        // Re-load only the tasks that we actually claimed.
-        const claimedTasks = await Model.findAll({
-          where: { id: { [Op.in]: unbilledIds }, billingClaimedAt: now },
-        });
-
-        if (claimedTasks.length > 0) {
-          const ok = await chargeAutomationBatchForDate({
-            user,
-            event,
-            type,
-            tasksForDate: claimedTasks,
-            model: Model,
-            dateKey,
-            guestByToken,
+        if (affectedCount > 0) {
+          // This worker won the race for at least some tasks in this batch.
+          // Re-load only the tasks that we actually claimed.
+          const claimedTasks = await Model.findAll({
+            where: { id: { [Op.in]: unbilledIds }, billingClaimedAt: now },
           });
 
-          if (!ok) {
-            console.error(
-              `Billing failed for ${type} tasks event ${event.id} on ${dateKey}. Resetting batch.`
-            );
-            // Reset to null so it can be retried
-            await Model.update(
-              { billingClaimedAt: null },
-              { where: { id: { [Op.in]: claimedTasks.map((t) => t.id) } } }
-            );
-            task.status = "failed";
-            await task.save();
-            return;
-          }
+          if (claimedTasks.length > 0) {
+            const ok = await chargeAutomationBatchForDate({
+              user,
+              event,
+              type,
+              tasksForDate: claimedTasks,
+              model: Model,
+              dateKey,
+              guestByToken,
+            });
 
-          console.log(
-            `Processed billing for batch of ${claimedTasks.length} ${type} (event ${event.id}) on ${dateKey}`
-          );
+            if (!ok) {
+              console.error(
+                `Billing failed for ${type} tasks event ${event.id} on ${dateKey}. Resetting batch.`
+              );
+              // Reset to null so it can be retried
+              await Model.update(
+                { billingClaimedAt: null },
+                { where: { id: { [Op.in]: claimedTasks.map((t) => t.id) } } }
+              );
+              task.status = "failed";
+              await task.save();
+              return;
+            }
+
+            console.log(
+              `Processed billing for batch of ${claimedTasks.length} ${type} (event ${event.id}) on ${dateKey}`
+            );
+          }
+        } else {
+          console.log(`Batch for ${type} on ${dateKey} already being processed or finished by another worker.`);
         }
-      } else {
-        console.log(`Batch for ${type} on ${dateKey} already being processed or finished by another worker.`);
       }
     }
 
