@@ -148,28 +148,6 @@ function humanizeAutomationType(type) {
   }
 }
 
-function getEventTypeKeyForCall(eventTypeName) {
-  // Map event type name to plural key for the API call
-  if (!eventTypeName) return "events";
-
-  const normalized = eventTypeName.toLowerCase().trim();
-
-  switch (normalized) {
-    case "wedding":
-      return "weddings";
-    case "birthday":
-      return "birthdays";
-    case "concerts":
-      return "concerts";
-    case "corporate_event":
-      return "corporate_event";
-    case "charity_event":
-      return "charity_event";
-    default:
-      // Fallback: pluralize by adding 's'
-      return `${normalized}s`;
-  }
-}
 
 function loadTemplate(fileName) {
   const filePath = path.join(__dirname, "..", "templates", fileName);
@@ -719,44 +697,44 @@ const worker = new Worker(
             let callTime = "";
             if (eventDateObjForCall) {
               const dt = new Date(eventDateObjForCall);
-              callDate = dt.toLocaleDateString("he-IL");
+              const dd = String(dt.getDate()).padStart(2, "0");
+              const mm = String(dt.getMonth() + 1).padStart(2, "0");
+              const yyyy = dt.getFullYear();
+              callDate = `${dd}/${mm}/${yyyy}`;
               callTime = dt.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
             }
 
             // Load EventType to get the type name (wedding, birthday, etc.)
             const EventType = require("../models/eventType.model");
             const eventType = await EventType.findByPk(event.typeId);
-            const eventTypeKey = getEventTypeKeyForCall(eventType?.name || "event");
-
-            console.log(guest , guest.id)
 
             const requestBody = {
-              customer_name: guest?.name || "",
-              name: guest?.name || "",
-              customer_id: guest ? String(guest.id) : "Unknown",
-              number: task.guestNumber,
-              phone: task.guestNumber,
-              wedding:event.name? event.name : "Event",
-              id: String(task.id),
-              event_id: String(event.id),
-              user_id: String(event.userId),
-              [eventTypeKey]: {
-                [event?.name || ""]: {
-                  date: callDate,
-                  time: callTime,
-                  location: event?.location || "",
-                },
+              phone_number: task.guestNumber,
+              initial_context: {
+                customer_name: guest?.name || "",
+                customer_id: guest ? String(guest.id) : "Unknown",
+                number: task.guestNumber,
+                event_name: event?.name || "",
+                id: String(task.id),
+                event_id: String(event.id),
+                user_id: String(event.userId),
+                event_type: eventType?.name || "",
+                location_address: event?.location || "",
+                location_name: event?.location || "",
+                event_time: callTime,
+                event_date: callDate,
               },
             };
 
             console.log("🚀 AI CALL REQUEST BODY:", JSON.stringify(requestBody, null, 2));
 
             const response = await fetch(
-              "https://ingestion-api-291837461617.me-west1.run.app/submit-call",
+              "http://callfordor.or-on.io:3000/api/v1/public/agent/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
               {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
+                  "X-API-Key": "dgr_LIvKjQ15zxymcAlhHcBFJI1xy-KcCBw_1bXBkPRQ3zo",
                 },
                 body: JSON.stringify(requestBody),
               }

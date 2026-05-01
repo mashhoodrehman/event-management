@@ -27,3 +27,4 @@ coverage/
 # IDE files
 .vscode/
 .idea/
+config.bat
